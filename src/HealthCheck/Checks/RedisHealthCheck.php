@@ -1,0 +1,111 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Kiora\HealthCheckBundle\HealthCheck\Checks;
+
+use Kiora\HealthCheckBundle\HealthCheck\AbstractHealthCheck;
+use Kiora\HealthCheckBundle\HealthCheck\HealthCheckResult;
+use Kiora\HealthCheckBundle\HealthCheck\HealthCheckStatus;
+
+/**
+ * Health check for Redis connectivity.
+ *
+ * Verifies that Redis is available and responsive by sending a PING command.
+ * Supports both PHP Redis extension and Predis library.
+ *
+ * Automatically tagged with 'health_check.checker' via interface.
+ */
+class RedisHealthCheck extends AbstractHealthCheck
+{
+    /**
+     * @param string $host Redis host
+     * @param int $port Redis port
+     * @param bool $critical Whether this check is critical
+     */
+    public function __construct(
+        private readonly string $host = 'localhost',
+        private readonly int $port = 6379,
+        private readonly bool $critical = false
+    ) {
+    }
+
+    public function getName(): string
+    {
+        return 'redis';
+    }
+
+    public function getTimeout(): int
+    {
+        return 3;
+    }
+
+    public function isCritical(): bool
+    {
+        return $this->critical;
+    }
+
+    protected function doCheck(): HealthCheckResult
+    {
+        $redis = null;
+        try {
+            // Create Redis client and attempt connection
+            $redis = new \Redis();
+            $connected = @$redis->connect($this->host, $this->port, 2);
+
+            if (!$connected) {
+                return new HealthCheckResult(
+                    name: $this->getName(),
+                    status: HealthCheckStatus::UNHEALTHY,
+                    message: 'Redis connection failed',
+                    duration: 0.0,
+                    metadata: []
+                );
+            }
+
+            // Send PING command to Redis
+            $response = $redis->ping();
+
+            // Check response (both phpredis and Predis return specific values)
+            $isPongValid = $response === true
+                || $response === '+PONG'
+                || $response === 'PONG'
+                || (is_array($response) && isset($response[0]) && $response[0] === 'PONG');
+
+            if (!$isPongValid) {
+                return new HealthCheckResult(
+                    name: $this->getName(),
+                    status: HealthCheckStatus::UNHEALTHY,
+                    message: 'Redis ping failed',
+                    duration: 0.0,
+                    metadata: []
+                );
+            }
+
+            return new HealthCheckResult(
+                name: $this->getName(),
+                status: HealthCheckStatus::HEALTHY,
+                message: 'Redis operational',
+                duration: 0.0,
+                metadata: []
+            );
+        } catch (\Exception $e) {
+            return new HealthCheckResult(
+                name: $this->getName(),
+                status: HealthCheckStatus::UNHEALTHY,
+                message: 'Redis connection failed',
+                duration: 0.0,
+                metadata: []
+            );
+        } finally {
+            // Close Redis connection if it was established
+            if ($redis instanceof \Redis) {
+                try {
+                    @$redis->close();
+                } catch (\Exception $e) {
+                    // Ignore close errors
+                }
+            }
+        }
+    }
+}
