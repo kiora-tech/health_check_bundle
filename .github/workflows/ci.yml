@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  quality-checks:
+    name: Quality Checks (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo, pdo_mysql, pdo_pgsql, redis, mongodb, zip
+          coverage: xdebug
+          tools: composer:v2
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Install dependencies
+        run: |
+          composer config --no-plugins allow-plugins.phpro/grumphp true
+          composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Run PHPStan
+        run: composer phpstan
+
+      - name: Run PHP-CS-Fixer (check only)
+        run: composer cs-check
+
+      - name: Run PHPUnit tests
+        run: composer test
+
+      - name: Upload coverage to Codecov
+        if: matrix.php == '8.3'
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/clover.xml
+          fail_ci_if_error: false

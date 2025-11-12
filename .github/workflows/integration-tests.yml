@@ -1,0 +1,70 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  integration-tests:
+    name: Integration Tests with Real Services
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Build PHP test image
+        run: docker-compose -f docker-compose.test.yml build php-test
+
+      - name: Start test services
+        run: docker-compose -f docker-compose.test.yml up -d mysql-test postgres-test redis-test mongodb-test minio-test
+
+      - name: Wait for services to be healthy
+        run: |
+          echo "Waiting for MySQL..."
+          timeout 60 bash -c 'until docker-compose -f docker-compose.test.yml exec -T mysql-test mysqladmin ping -h localhost -u test -ptest --silent; do sleep 2; done'
+
+          echo "Waiting for PostgreSQL..."
+          timeout 60 bash -c 'until docker-compose -f docker-compose.test.yml exec -T postgres-test pg_isready -U test; do sleep 2; done'
+
+          echo "Waiting for Redis..."
+          timeout 60 bash -c 'until docker-compose -f docker-compose.test.yml exec -T redis-test redis-cli ping; do sleep 2; done'
+
+          echo "Waiting for MinIO..."
+          timeout 60 bash -c 'until curl -f http://localhost:9000/minio/health/live; do sleep 2; done'
+
+          echo "All services are ready!"
+
+      - name: Show service status
+        run: docker-compose -f docker-compose.test.yml ps
+
+      - name: Install dependencies
+        run: |
+          docker-compose -f docker-compose.test.yml exec -T php-test composer config --no-plugins allow-plugins.phpro/grumphp true
+          docker-compose -f docker-compose.test.yml exec -T php-test composer install --no-interaction --prefer-dist
+
+      - name: Run integration tests
+        run: docker-compose -f docker-compose.test.yml exec -T php-test composer test
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker-compose -f docker-compose.test.yml logs
+
+      - name: Stop and remove containers
+        if: always()
+        run: docker-compose -f docker-compose.test.yml down -v

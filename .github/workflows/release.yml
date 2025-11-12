@@ -1,0 +1,114 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: zip
+          tools: composer:v2
+          coverage: none
+
+      - name: Install dependencies
+        run: |
+          composer config --no-plugins allow-plugins.phpro/grumphp true
+          composer install --no-dev --prefer-dist --no-progress --no-interaction --optimize-autoloader
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREVIOUS_TAG=$(git describe --abbrev=0 --tags $(git rev-list --tags --skip=1 --max-count=1) 2>/dev/null || echo "")
+
+          if [ -z "$PREVIOUS_TAG" ]; then
+            # First release - get all commits
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            # Get commits since previous tag
+            CHANGELOG=$(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          fi
+
+          # Save to file for GitHub release
+          echo "$CHANGELOG" > CHANGELOG.txt
+
+          # Output for use in release notes
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create archive
+        run: |
+          mkdir -p build
+          rsync -av --exclude='build' \
+                    --exclude='.git' \
+                    --exclude='.github' \
+                    --exclude='tests' \
+                    --exclude='.phpunit.cache' \
+                    --exclude='coverage' \
+                    --exclude='vendor' \
+                    --exclude='.dockerignore' \
+                    --exclude='docker-compose*.yml' \
+                    --exclude='Dockerfile' \
+                    --exclude='Makefile' \
+                    --exclude='DOCKER_SETUP.md' \
+                    . build/health-check-bundle/
+
+          cd build
+          tar -czf health-check-bundle-${{ steps.get_version.outputs.VERSION }}.tar.gz health-check-bundle/
+          zip -r health-check-bundle-${{ steps.get_version.outputs.VERSION }}.zip health-check-bundle/
+          cd ..
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ steps.get_version.outputs.VERSION }}
+          body: |
+            ## Health Check Bundle v${{ steps.get_version.outputs.VERSION }}
+
+            ### Changes
+
+            ${{ steps.changelog.outputs.changelog }}
+
+            ### Installation
+
+            ```bash
+            composer require kiora/health-check-bundle:^${{ steps.get_version.outputs.VERSION }}
+            ```
+
+            ### Documentation
+
+            See the [README](https://github.com/kiora-tech/health_check_bundle/blob/v${{ steps.get_version.outputs.VERSION }}/README.md) for installation and usage instructions.
+          files: |
+            build/*.tar.gz
+            build/*.zip
+          draft: false
+          prerelease: false
+
+      - name: Trigger Packagist update
+        if: success()
+        run: |
+          curl -XPOST -H'content-type:application/json' \
+               'https://packagist.org/api/update-package?username=kiora-tech&apiToken=${{ secrets.PACKAGIST_TOKEN }}' \
+               -d'{"repository":{"url":"https://github.com/kiora-tech/health_check_bundle"}}'

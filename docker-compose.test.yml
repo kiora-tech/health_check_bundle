@@ -1,0 +1,130 @@
+services:
+  php-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: health_check_bundle_test
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      # MySQL connection
+      MYSQL_HOST: mysql-test
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: health_check_test
+      MYSQL_USER: test
+      MYSQL_PASSWORD: test
+      # PostgreSQL connection
+      POSTGRES_HOST: postgres-test
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: health_check_test
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      # Redis connection
+      REDIS_HOST: redis-test
+      REDIS_PORT: 6379
+      # MongoDB connection
+      MONGODB_HOST: mongodb-test
+      MONGODB_PORT: 27017
+      # MinIO connection
+      MINIO_ENDPOINT: http://minio-test:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    command: >
+      sh -c "
+        echo 'Waiting for services to be ready...' &&
+        sleep 10 &&
+        echo 'Running tests...' &&
+        composer test
+      "
+    networks:
+      - test_network
+    depends_on:
+      mysql-test:
+        condition: service_healthy
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+      mongodb-test:
+        condition: service_started
+      minio-test:
+        condition: service_healthy
+
+  mysql-test:
+    image: mysql:8.0
+    container_name: health_check_test_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: test
+      MYSQL_DATABASE: health_check_test
+      MYSQL_USER: test
+      MYSQL_PASSWORD: test
+    tmpfs:
+      - /var/lib/mysql  # Use tmpfs for faster tests
+    networks:
+      - test_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "test", "-ptest"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+
+  postgres-test:
+    image: postgres:16
+    container_name: health_check_test_postgres
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: health_check_test
+    tmpfs:
+      - /var/lib/postgresql/data  # Use tmpfs for faster tests
+    networks:
+      - test_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+
+  redis-test:
+    image: redis:7-alpine
+    container_name: health_check_test_redis
+    networks:
+      - test_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+
+  mongodb-test:
+    image: mongo:7
+    container_name: health_check_test_mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: test
+      MONGO_INITDB_ROOT_PASSWORD: test
+    tmpfs:
+      - /data/db  # Use tmpfs for faster tests
+    networks:
+      - test_network
+
+  minio-test:
+    image: minio/minio:latest
+    container_name: health_check_test_minio
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    tmpfs:
+      - /data  # Use tmpfs for faster tests
+    networks:
+      - test_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+
+networks:
+  test_network:
+    driver: bridge

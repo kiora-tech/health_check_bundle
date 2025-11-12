@@ -2,7 +2,10 @@
 
 A Symfony bundle providing comprehensive health check functionality for monitoring application dependencies and services.
 
-[![PHP Version](https://img.shields.io/badge/php-%3E%3D8.2-blue)](https://www.php.net/)
+[![CI](https://github.com/kiora-tech/health_check_bundle/workflows/CI/badge.svg)](https://github.com/kiora-tech/health_check_bundle/actions/workflows/ci.yml)
+[![Integration Tests](https://github.com/kiora-tech/health_check_bundle/workflows/Integration%20Tests/badge.svg)](https://github.com/kiora-tech/health_check_bundle/actions/workflows/integration-tests.yml)
+[![Symfony Compatibility](https://github.com/kiora-tech/health_check_bundle/workflows/Symfony%20Compatibility/badge.svg)](https://github.com/kiora-tech/health_check_bundle/actions/workflows/symfony-compatibility.yml)
+[![PHP Version](https://img.shields.io/badge/php-%3E%3D8.3-blue)](https://www.php.net/)
 [![Symfony Version](https://img.shields.io/badge/symfony-%5E6.4%7C%5E7.0-green)](https://symfony.com/)
 
 ## Features
@@ -477,10 +480,49 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ### Development Setup
 
+#### Local Setup (Requires PHP 8.3+)
+
 ```bash
 git clone https://github.com/kiora-tech/health_check_bundle.git
 cd health_check_bundle
 composer install
+```
+
+#### Docker Setup (Recommended)
+
+If you prefer not to install PHP locally, use Docker:
+
+```bash
+# Clone the repository
+git clone https://github.com/kiora-tech/health_check_bundle.git
+cd health_check_bundle
+
+# Using Makefile (recommended)
+make up           # Start development environment
+make install      # Install dependencies
+make test         # Run tests
+make phpstan      # Run static analysis
+make cs-fix       # Fix code style
+make qa           # Run all quality checks
+make shell        # Open shell in PHP container
+make down         # Stop environment
+
+# Or using docker-compose directly
+docker-compose up -d
+docker-compose exec php composer install
+docker-compose exec php composer test
+docker-compose down
+```
+
+**Available services:**
+- `php` - PHP 8.3 CLI with all extensions (Redis, MongoDB, Xdebug)
+- `mysql` - MySQL 8.0 (port 3306)
+- `postgres` - PostgreSQL 16 (port 5432)
+- `redis` - Redis 7 (port 6379)
+
+**Quick start:**
+```bash
+make up && make install && make test
 ```
 
 ### Code Quality
@@ -505,6 +547,28 @@ composer cs-fix        # PHP-CS-Fixer fix
 - **Type hints**: Use type hints for all method parameters and return types
 - **PHPStan Level 8**: Code must pass PHPStan level 8 analysis
 - **Tests**: Add tests for new features and bug fixes
+
+### Integration Testing with Docker
+
+Run integration tests with real services (MySQL, PostgreSQL, Redis, MongoDB, MinIO):
+
+```bash
+# Start test services
+docker-compose -f docker-compose.test.yml up --abort-on-container-exit
+
+# Or run in detached mode and check logs
+docker-compose -f docker-compose.test.yml up -d
+docker-compose -f docker-compose.test.yml logs -f php-test
+
+# Clean up after tests
+docker-compose -f docker-compose.test.yml down -v
+```
+
+**Benefits of integration testing:**
+- Tests run against real database services, not mocks
+- Catches integration issues early
+- Provides confidence for releases
+- Easy for contributors to run the full test suite without local setup
 
 ## Support
 

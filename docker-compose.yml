@@ -1,0 +1,80 @@
+services:
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: health_check_bundle_php
+    volumes:
+      - .:/app
+      - composer_cache:/root/.composer/cache
+    working_dir: /app
+    networks:
+      - health_check_network
+    depends_on:
+      - mysql
+      - postgres
+      - redis
+
+  mysql:
+    image: mysql:8.0
+    container_name: health_check_bundle_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: health_check_dev
+      MYSQL_USER: dev
+      MYSQL_PASSWORD: dev
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - health_check_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  postgres:
+    image: postgres:16
+    container_name: health_check_bundle_postgres
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: health_check_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - health_check_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: health_check_bundle_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - health_check_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  mysql_data:
+  postgres_data:
+  redis_data:
+  composer_cache:
+
+networks:
+  health_check_network:
+    driver: bridge
