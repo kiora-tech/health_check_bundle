@@ -19,10 +19,7 @@ jobs:
       matrix:
         php: ['8.3', '8.4']
         symfony: ['6.4.*', '7.0.*', '7.1.*', '7.2.*']
-        exclude:
-          # Symfony 6.4 requires PHP 8.1+, compatible with 8.3 and 8.4
-          # Symfony 7.x requires PHP 8.2+, compatible with 8.3 and 8.4
-          # No exclusions needed for our matrix
+        # All combinations are compatible (PHP 8.3+ with Symfony 6.4+)
 
     steps:
       - name: Checkout code
