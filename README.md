@@ -17,6 +17,7 @@ A Symfony bundle providing comprehensive health check functionality for monitori
 - 🎯 **Flexible**: Critical vs non-critical checks, enable/disable per check
 - 🛡️ **Production Ready**: Rate limiting, security headers, generic error messages
 - 📊 **Standard Format**: JSON response with status, duration, and individual check results
+- 📈 **Performance Statistics**: Monitor slow checks, average execution time, and identify performance bottlenecks
 
 ## Development with Docker
 
@@ -346,9 +347,30 @@ curl http://localhost/health
       "duration": 0.001,
       "metadata": []
     }
-  ]
+  ],
+  "statistics": {
+    "total_checks": 2,
+    "slow_checks": 0,
+    "average_duration": 0.002,
+    "slowest_check": {
+      "name": "database",
+      "duration": 0.002
+    }
+  }
 }
 ```
+
+#### Statistics Breakdown
+
+The `statistics` section provides performance insights:
+
+- **total_checks**: Total number of health checks executed
+- **slow_checks**: Number of checks that took longer than 1 second to execute
+- **average_duration**: Average execution time across all checks (in seconds)
+- **slowest_check**: Details of the slowest health check
+  - `name`: Name of the slowest check
+  - `duration`: Execution time in seconds
+  - Will be `null` if no checks were executed
 
 ### Status Codes
 
