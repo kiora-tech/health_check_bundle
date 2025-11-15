@@ -1,0 +1,37 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Dependencies
+vendor/
+node_modules/
+
+# Testing
+.phpunit.cache/
+coverage/
+coverage.xml
+phpunit.xml
+
+# CI/CD
+.github/
+
+# Documentation
+*.md
+!README.md
+
+# Other
+.DS_Store
+Thumbs.db

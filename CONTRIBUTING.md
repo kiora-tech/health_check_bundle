@@ -13,12 +13,14 @@ Thank you for your interest in contributing to Health Check Bundle! We welcome c
 ### Installation
 
 1. Fork and clone the repository:
+
 ```bash
 git clone https://github.com/your-username/health_check_bundle.git
 cd health_check_bundle
 ```
 
-2. Install dependencies:
+1. Install dependencies:
+
 ```bash
 composer install
 ```
@@ -28,11 +30,13 @@ composer install
 ### Running Tests
 
 Run the full test suite:
+
 ```bash
 composer test
 ```
 
 Run specific tests:
+
 ```bash
 ./vendor/bin/phpunit tests/HealthCheck/HealthCheckResultTest.php
 ```
@@ -42,23 +46,29 @@ Run specific tests:
 We maintain high code quality standards. Before submitting a PR, ensure your code passes:
 
 #### PHPStan (Level 8)
+
 ```bash
 composer phpstan
 ```
 
 #### PHP-CS-Fixer
+
 Check code style:
+
 ```bash
 composer cs-check
 ```
 
 Fix code style:
+
 ```bash
 composer cs-fix
 ```
 
 #### All Quality Checks
+
 Run all checks at once:
+
 ```bash
 composer check
 ```
@@ -66,6 +76,7 @@ composer check
 ## Pull Request Process
 
 1. **Create a feature branch** from `main`:
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -77,21 +88,25 @@ composer check
 4. **Update documentation** if needed (README.md, inline comments)
 
 5. **Run quality checks**:
+
    ```bash
    composer check
    ```
 
 6. **Commit your changes** with clear, descriptive messages:
+
    ```bash
    git commit -m "feat: add new health check for RabbitMQ"
    ```
 
 7. **Push to your fork**:
+
    ```bash
    git push origin feature/your-feature-name
    ```
 
 8. **Create a Pull Request** with:
+
    - Clear title describing the change
    - Description of what changed and why
    - Reference to related issues (e.g., "Fixes #42")
@@ -110,7 +125,8 @@ We follow conventional commits:
 - `chore:` Maintenance tasks
 
 Examples:
-```
+
+```text
 feat: add MongoDB health check
 fix: correct timeout handling in Redis check
 docs: update installation instructions

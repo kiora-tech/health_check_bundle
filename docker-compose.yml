@@ -1,0 +1,104 @@
+services:
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: health-check-php
+    volumes:
+      - .:/app
+    networks:
+      - health-check-network
+    depends_on:
+      - mysql
+      - postgres
+      - redis
+      - minio
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_DATABASE=health_check_test
+      - MYSQL_USER=test
+      - MYSQL_PASSWORD=test
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=health_check_test
+      - POSTGRES_USER=test
+      - POSTGRES_PASSWORD=test
+      - REDIS_HOST=redis
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+    command: tail -f /dev/null
+
+  mysql:
+    image: mysql:8.0
+    container_name: health-check-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: health_check_test
+      MYSQL_USER: test
+      MYSQL_PASSWORD: test
+    ports:
+      - "3306:3306"
+    networks:
+      - health-check-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: health-check-postgres
+    environment:
+      POSTGRES_DB: health_check_test
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+    ports:
+      - "5432:5432"
+    networks:
+      - health-check-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: health-check-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - health-check-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: health-check-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9002:9001"
+    networks:
+      - health-check-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - minio-data:/data
+
+networks:
+  health-check-network:
+    driver: bridge
+
+volumes:
+  minio-data:

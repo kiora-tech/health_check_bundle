@@ -19,11 +19,11 @@ use Kiora\HealthCheckBundle\HealthCheck\HealthCheckStatus;
 class HttpHealthCheck extends AbstractHealthCheck
 {
     /**
-     * @param string $url The URL to check
-     * @param string $name Optional custom name for this check
-     * @param int $timeout Timeout in seconds
-     * @param bool $critical Whether this check is critical
-     * @param int[] $expectedStatusCodes Expected HTTP status codes (default: 200, 201, 204)
+     * @param string $url                 The URL to check
+     * @param string $name                Optional custom name for this check
+     * @param int    $timeout             Timeout in seconds
+     * @param bool   $critical            Whether this check is critical
+     * @param int[]  $expectedStatusCodes Expected HTTP status codes (default: 200, 201, 204)
      */
     public function __construct(
         private readonly string $url,
@@ -64,7 +64,7 @@ class HttpHealthCheck extends AbstractHealthCheck
             // Perform HTTP request
             $response = @file_get_contents($this->url, false, $context);
 
-            if ($response === false) {
+            if (false === $response) {
                 return new HealthCheckResult(
                     name: $this->getName(),
                     status: HealthCheckStatus::UNHEALTHY,
@@ -76,7 +76,8 @@ class HttpHealthCheck extends AbstractHealthCheck
 
             // Parse HTTP response code
             $statusCode = 0;
-            if (isset($http_response_header) && count($http_response_header) > 0) {
+            // @phpstan-ignore-next-line - $http_response_header is a magic variable set by file_get_contents()
+            if (count($http_response_header ?? []) > 0) {
                 preg_match('/HTTP\/\d\.\d\s+(\d+)/', $http_response_header[0], $matches);
                 $statusCode = (int) ($matches[1] ?? 0);
             }

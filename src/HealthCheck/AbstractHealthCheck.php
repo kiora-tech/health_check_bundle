@@ -50,10 +50,8 @@ abstract class AbstractHealthCheck implements HealthCheckInterface
                 metadata: []
             );
         } finally {
-            // Restore previous timeout
-            if ($previousTimeout !== false) {
-                set_time_limit((int) $previousTimeout);
-            }
+            // Restore previous timeout (cast to int, 0 if false/empty)
+            set_time_limit(false !== $previousTimeout ? (int) $previousTimeout : 0);
         }
     }
 

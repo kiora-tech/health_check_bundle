@@ -19,9 +19,9 @@ use Kiora\HealthCheckBundle\HealthCheck\HealthCheckStatus;
 class RedisHealthCheck extends AbstractHealthCheck
 {
     /**
-     * @param string $host Redis host
-     * @param int $port Redis port
-     * @param bool $critical Whether this check is critical
+     * @param string $host     Redis host
+     * @param int    $port     Redis port
+     * @param bool   $critical Whether this check is critical
      */
     public function __construct(
         private readonly string $host = 'localhost',
@@ -48,6 +48,7 @@ class RedisHealthCheck extends AbstractHealthCheck
     protected function doCheck(): HealthCheckResult
     {
         $redis = null;
+
         try {
             // Create Redis client and attempt connection
             $redis = new \Redis();
@@ -66,11 +67,11 @@ class RedisHealthCheck extends AbstractHealthCheck
             // Send PING command to Redis
             $response = $redis->ping();
 
-            // Check response (both phpredis and Predis return specific values)
-            $isPongValid = $response === true
-                || $response === '+PONG'
-                || $response === 'PONG'
-                || (is_array($response) && isset($response[0]) && $response[0] === 'PONG');
+            // Check response
+            // phpredis returns true, Predis string client returns '+PONG' or 'PONG'
+            $isPongValid = true === $response
+                || '+PONG' === $response
+                || 'PONG' === $response;
 
             if (!$isPongValid) {
                 return new HealthCheckResult(
