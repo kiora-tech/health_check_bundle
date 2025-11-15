@@ -58,21 +58,7 @@ class RedisHealthCheckTest extends TestCase
             $this->markTestSkipped('Redis extension not available');
         }
 
-        // Use Redis hostname from Docker environment, fallback to localhost
-        $host = getenv('REDIS_HOST') ?: 'localhost';
-
-        // Skip if Redis is not available
-        $redis = new \Redis();
-        try {
-            if (!@$redis->connect($host, 6379, 1)) {
-                $this->markTestSkipped(sprintf('Redis server not available at %s:6379', $host));
-            }
-            $redis->close();
-        } catch (\RedisException $e) {
-            $this->markTestSkipped(sprintf('Redis server not available at %s:6379 - %s', $host, $e->getMessage()));
-        }
-
-        $check = new RedisHealthCheck(host: $host);
+        $check = new RedisHealthCheck();
         $result = $check->check();
 
         $this->assertSame(HealthCheckStatus::HEALTHY, $result->status);
@@ -113,21 +99,7 @@ class RedisHealthCheckTest extends TestCase
             $this->markTestSkipped('Redis extension not available');
         }
 
-        // Use Redis hostname from Docker environment, fallback to localhost
-        $host = getenv('REDIS_HOST') ?: 'localhost';
-
-        // Skip if Redis is not available
-        $redis = new \Redis();
-        try {
-            if (!@$redis->connect($host, 6379, 1)) {
-                $this->markTestSkipped(sprintf('Redis server not available at %s:6379', $host));
-            }
-            $redis->close();
-        } catch (\RedisException $e) {
-            $this->markTestSkipped(sprintf('Redis server not available at %s:6379 - %s', $host, $e->getMessage()));
-        }
-
-        $check = new RedisHealthCheck(host: $host);
+        $check = new RedisHealthCheck();
 
         // First check should create connection
         $result1 = $check->check();
@@ -157,27 +129,13 @@ class RedisHealthCheckTest extends TestCase
             $this->markTestSkipped('Redis extension not available');
         }
 
-        // Use Redis hostname from Docker environment, fallback to localhost
-        $host = getenv('REDIS_HOST') ?: 'localhost';
-
         // First try with invalid port to force failure
         $check = new RedisHealthCheck(host: 'invalid.host.example.com', port: 9999);
         $result1 = $check->check();
         $this->assertSame(HealthCheckStatus::UNHEALTHY, $result1->status);
 
-        // Now check if Redis is available
-        $redis = new \Redis();
-        try {
-            if (!@$redis->connect($host, 6379, 1)) {
-                $this->markTestSkipped(sprintf('Redis server not available at %s:6379 for recovery test', $host));
-            }
-            $redis->close();
-        } catch (\RedisException $e) {
-            $this->markTestSkipped(sprintf('Redis server not available at %s:6379 for recovery test - %s', $host, $e->getMessage()));
-        }
-
         // Create a new check with valid settings to test recovery
-        $checkRecovered = new RedisHealthCheck(host: $host);
+        $checkRecovered = new RedisHealthCheck();
         $result2 = $checkRecovered->check();
 
         // Should successfully connect with valid settings
@@ -191,22 +149,8 @@ class RedisHealthCheckTest extends TestCase
             $this->markTestSkipped('Redis extension not available');
         }
 
-        // Use Redis hostname from Docker environment, fallback to localhost
-        $host = getenv('REDIS_HOST') ?: 'localhost';
-
-        // Skip if Redis is not available
-        $redis = new \Redis();
-        try {
-            if (!@$redis->connect($host, 6379, 1)) {
-                $this->markTestSkipped(sprintf('Redis server not available at %s:6379', $host));
-            }
-            $redis->close();
-        } catch (\RedisException $e) {
-            $this->markTestSkipped(sprintf('Redis server not available at %s:6379 - %s', $host, $e->getMessage()));
-        }
-
-        $check1 = new RedisHealthCheck(host: $host, critical: true);
-        $check2 = new RedisHealthCheck(host: $host, critical: false);
+        $check1 = new RedisHealthCheck(critical: true);
+        $check2 = new RedisHealthCheck(critical: false);
 
         $result1 = $check1->check();
         $result2 = $check2->check();
@@ -226,21 +170,7 @@ class RedisHealthCheckTest extends TestCase
             $this->markTestSkipped('Redis extension not available');
         }
 
-        // Use Redis hostname from Docker environment, fallback to localhost
-        $host = getenv('REDIS_HOST') ?: 'localhost';
-
-        // Skip if Redis is not available
-        $redis = new \Redis();
-        try {
-            if (!@$redis->connect($host, 6379, 1)) {
-                $this->markTestSkipped(sprintf('Redis server not available at %s:6379', $host));
-            }
-            $redis->close();
-        } catch (\RedisException $e) {
-            $this->markTestSkipped(sprintf('Redis server not available at %s:6379 - %s', $host, $e->getMessage()));
-        }
-
-        $check = new RedisHealthCheck(host: $host);
+        $check = new RedisHealthCheck();
 
         // Perform multiple checks to verify persistent connection works
         for ($i = 0; $i < 5; ++$i) {
@@ -256,27 +186,11 @@ class RedisHealthCheckTest extends TestCase
             $this->markTestSkipped('Redis extension not available');
         }
 
-        // Use Redis hostname from Docker environment, fallback to localhost
-        $host = getenv('REDIS_HOST') ?: 'localhost';
-
-        $check = new RedisHealthCheck(host: $host, port: 6379);
+        $check = new RedisHealthCheck(host: 'localhost', port: 6379);
 
         $this->assertSame('redis', $check->getName());
 
-        // Try to connect - will only succeed if Redis is running
-        $redis = new \Redis();
-        try {
-            if (@$redis->connect($host, 6379, 1)) {
-                $redis->close();
-                $result = $check->check();
-                $this->assertSame(HealthCheckStatus::HEALTHY, $result->status);
-            } else {
-                // If Redis is not available, skip the connection test
-                $this->markTestSkipped(sprintf('Redis server not available at %s:6379', $host));
-            }
-        } catch (\RedisException $e) {
-            // If Redis is not available, skip the connection test
-            $this->markTestSkipped(sprintf('Redis server not available at %s:6379 - %s', $host, $e->getMessage()));
-        }
+        $result = $check->check();
+        $this->assertSame(HealthCheckStatus::HEALTHY, $result->status);
     }
 }
