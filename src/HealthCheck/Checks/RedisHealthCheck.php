@@ -13,10 +13,20 @@ use Kiora\HealthCheckBundle\HealthCheck\HealthCheckResult;
  * Verifies that Redis is available and responsive by sending a PING command.
  * Supports both PHP Redis extension and Predis library.
  *
+ * Uses persistent connections to reduce connection overhead and improve performance.
+ * Connection is reused across multiple health check executions and automatically
+ * recreated if it becomes disconnected.
+ *
  * Automatically tagged with 'health_check.checker' via interface.
  */
 class RedisHealthCheck extends AbstractHealthCheck
 {
+    /**
+     * Persistent Redis connection instance.
+     * Null when not yet connected or after connection failure.
+     */
+    private ?\Redis $connection = null;
+
     /**
      * @param string   $host     Redis host
      * @param int      $port     Redis port
@@ -53,16 +63,8 @@ class RedisHealthCheck extends AbstractHealthCheck
 
     protected function doCheck(): HealthCheckResult
     {
-        $redis = null;
-
         try {
-            // Create Redis client and attempt connection
-            $redis = new \Redis();
-            $connected = @$redis->connect($this->host, $this->port, 2);
-
-            if (!$connected) {
-                return $this->createUnhealthyResult('Redis connection failed');
-            }
+            $redis = $this->getConnection();
 
             // Send PING command to Redis
             $response = $redis->ping();
@@ -74,21 +76,48 @@ class RedisHealthCheck extends AbstractHealthCheck
                 || 'PONG' === $response;
 
             if (!$isPongValid) {
+                // Reset connection on ping failure to allow recovery
+                $this->connection = null;
+
                 return $this->createUnhealthyResult('Redis ping failed');
             }
 
             return $this->createHealthyResult('Redis operational');
         } catch (\Exception $e) {
+            // Reset connection on failure to allow recovery on next check
+            $this->connection = null;
+
             return $this->createUnhealthyResult('Redis connection failed');
-        } finally {
-            // Close Redis connection if it was established
-            if ($redis instanceof \Redis) {
-                try {
-                    @$redis->close();
-                } catch (\Exception $e) {
-                    // Ignore close errors
-                }
-            }
         }
+    }
+
+    /**
+     * Get or create a persistent Redis connection.
+     *
+     * Reuses existing connection if it's still connected, otherwise creates
+     * a new persistent connection. This reduces connection overhead and
+     * improves health check performance.
+     *
+     * @throws \RuntimeException If connection cannot be established
+     */
+    private function getConnection(): \Redis
+    {
+        // Reuse existing connection if it's still active
+        if (null !== $this->connection && $this->connection->isConnected()) {
+            return $this->connection;
+        }
+
+        // Create new persistent connection
+        $this->connection = new \Redis();
+
+        // Use pconnect for persistent connections across multiple health checks
+        // Timeout of 2 seconds for connection establishment
+        if (!@$this->connection->pconnect($this->host, $this->port, 2)) {
+            $this->connection = null;
+
+            throw new \RuntimeException(sprintf('Failed to establish persistent connection to Redis at %s:%d', $this->host, $this->port));
+        }
+
+        return $this->connection;
     }
 }
