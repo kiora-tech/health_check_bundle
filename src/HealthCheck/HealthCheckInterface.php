@@ -51,4 +51,14 @@ interface HealthCheckInterface
      * @return bool True if the check is critical, false otherwise
      */
     public function isCritical(): bool;
+
+    /**
+     * Get the groups/contexts this check belongs to.
+     *
+     * Groups allow filtering checks by context (e.g., 'web', 'worker', 'console').
+     * A check can belong to multiple groups.
+     *
+     * @return string[] Array of group names
+     */
+    public function getGroups(): array;
 }

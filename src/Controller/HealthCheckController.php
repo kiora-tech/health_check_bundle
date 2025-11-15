@@ -7,6 +7,7 @@ namespace Kiora\HealthCheckBundle\Controller;
 use Kiora\HealthCheckBundle\Service\HealthCheckService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
@@ -25,13 +26,15 @@ class HealthCheckController extends AbstractController
      * Get the overall health status of the application.
      *
      * Returns HTTP 200 if healthy, 503 if unhealthy.
+     * Supports optional ?group= query parameter to filter checks by group.
      *
      * @return JsonResponse JSON response with health check results
      */
     #[Route('/health', name: 'health_check', methods: ['GET'])]
-    public function check(): JsonResponse
+    public function check(Request $request): JsonResponse
     {
-        $results = $this->healthCheckService->runAllChecks();
+        $group = $request->query->get('group');
+        $results = $this->healthCheckService->runAllChecks($group);
 
         $statusCode = 'healthy' === $results['status'] ? 200 : 503;
 

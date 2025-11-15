@@ -25,17 +25,24 @@ class HealthCheckService
     }
 
     /**
-     * Execute all registered health checks.
+     * Execute all registered health checks, optionally filtered by group.
+     *
+     * @param string|null $group Optional group filter (e.g., 'web', 'worker', 'console')
      *
      * @return array{status: string, timestamp: string, duration: float, checks: array<int, array<string, mixed>>}
      */
-    public function runAllChecks(): array
+    public function runAllChecks(?string $group = null): array
     {
         $startTime = microtime(true);
         $results = [];
         $overallStatus = HealthCheckStatus::HEALTHY;
 
         foreach ($this->healthChecks as $healthCheck) {
+            // Filter by group if specified
+            if (null !== $group && !$this->checkBelongsToGroup($healthCheck, $group)) {
+                continue;
+            }
+
             $result = $healthCheck->check();
             $results[] = $result;
 
@@ -56,6 +63,25 @@ class HealthCheckService
                 $results
             ),
         ];
+    }
+
+    /**
+     * Determine if a health check belongs to a specific group.
+     *
+     * A check belongs to a group if:
+     * - Its groups array is empty (belongs to all groups), OR
+     * - The specified group is in its groups array
+     */
+    private function checkBelongsToGroup(HealthCheckInterface $healthCheck, string $group): bool
+    {
+        $groups = $healthCheck->getGroups();
+
+        // Empty groups array means the check belongs to all groups
+        if ([] === $groups) {
+            return true;
+        }
+
+        return in_array($group, $groups, true);
     }
 
     /**
