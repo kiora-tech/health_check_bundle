@@ -63,10 +63,14 @@ class RedisHealthCheckTest extends TestCase
 
         // Skip if Redis is not available
         $redis = new \Redis();
-        if (!@$redis->connect($host, 6379, 1)) {
-            $this->markTestSkipped(sprintf('Redis server not available at %s:6379', $host));
+        try {
+            if (!@$redis->connect($host, 6379, 1)) {
+                $this->markTestSkipped(sprintf('Redis server not available at %s:6379', $host));
+            }
+            $redis->close();
+        } catch (\RedisException $e) {
+            $this->markTestSkipped(sprintf('Redis server not available at %s:6379 - %s', $host, $e->getMessage()));
         }
-        $redis->close();
 
         $check = new RedisHealthCheck(host: $host);
         $result = $check->check();
@@ -114,10 +118,14 @@ class RedisHealthCheckTest extends TestCase
 
         // Skip if Redis is not available
         $redis = new \Redis();
-        if (!@$redis->connect($host, 6379, 1)) {
-            $this->markTestSkipped(sprintf('Redis server not available at %s:6379', $host));
+        try {
+            if (!@$redis->connect($host, 6379, 1)) {
+                $this->markTestSkipped(sprintf('Redis server not available at %s:6379', $host));
+            }
+            $redis->close();
+        } catch (\RedisException $e) {
+            $this->markTestSkipped(sprintf('Redis server not available at %s:6379 - %s', $host, $e->getMessage()));
         }
-        $redis->close();
 
         $check = new RedisHealthCheck(host: $host);
 
@@ -159,10 +167,14 @@ class RedisHealthCheckTest extends TestCase
 
         // Now check if Redis is available
         $redis = new \Redis();
-        if (!@$redis->connect($host, 6379, 1)) {
-            $this->markTestSkipped(sprintf('Redis server not available at %s:6379 for recovery test', $host));
+        try {
+            if (!@$redis->connect($host, 6379, 1)) {
+                $this->markTestSkipped(sprintf('Redis server not available at %s:6379 for recovery test', $host));
+            }
+            $redis->close();
+        } catch (\RedisException $e) {
+            $this->markTestSkipped(sprintf('Redis server not available at %s:6379 for recovery test - %s', $host, $e->getMessage()));
         }
-        $redis->close();
 
         // Create a new check with valid settings to test recovery
         $checkRecovered = new RedisHealthCheck(host: $host);
@@ -184,10 +196,14 @@ class RedisHealthCheckTest extends TestCase
 
         // Skip if Redis is not available
         $redis = new \Redis();
-        if (!@$redis->connect($host, 6379, 1)) {
-            $this->markTestSkipped(sprintf('Redis server not available at %s:6379', $host));
+        try {
+            if (!@$redis->connect($host, 6379, 1)) {
+                $this->markTestSkipped(sprintf('Redis server not available at %s:6379', $host));
+            }
+            $redis->close();
+        } catch (\RedisException $e) {
+            $this->markTestSkipped(sprintf('Redis server not available at %s:6379 - %s', $host, $e->getMessage()));
         }
-        $redis->close();
 
         $check1 = new RedisHealthCheck(host: $host, critical: true);
         $check2 = new RedisHealthCheck(host: $host, critical: false);
@@ -215,10 +231,14 @@ class RedisHealthCheckTest extends TestCase
 
         // Skip if Redis is not available
         $redis = new \Redis();
-        if (!@$redis->connect($host, 6379, 1)) {
-            $this->markTestSkipped(sprintf('Redis server not available at %s:6379', $host));
+        try {
+            if (!@$redis->connect($host, 6379, 1)) {
+                $this->markTestSkipped(sprintf('Redis server not available at %s:6379', $host));
+            }
+            $redis->close();
+        } catch (\RedisException $e) {
+            $this->markTestSkipped(sprintf('Redis server not available at %s:6379 - %s', $host, $e->getMessage()));
         }
-        $redis->close();
 
         $check = new RedisHealthCheck(host: $host);
 
@@ -245,13 +265,18 @@ class RedisHealthCheckTest extends TestCase
 
         // Try to connect - will only succeed if Redis is running
         $redis = new \Redis();
-        if (@$redis->connect($host, 6379, 1)) {
-            $redis->close();
-            $result = $check->check();
-            $this->assertSame(HealthCheckStatus::HEALTHY, $result->status);
-        } else {
+        try {
+            if (@$redis->connect($host, 6379, 1)) {
+                $redis->close();
+                $result = $check->check();
+                $this->assertSame(HealthCheckStatus::HEALTHY, $result->status);
+            } else {
+                // If Redis is not available, skip the connection test
+                $this->markTestSkipped(sprintf('Redis server not available at %s:6379', $host));
+            }
+        } catch (\RedisException $e) {
             // If Redis is not available, skip the connection test
-            $this->markTestSkipped(sprintf('Redis server not available at %s:6379', $host));
+            $this->markTestSkipped(sprintf('Redis server not available at %s:6379 - %s', $host, $e->getMessage()));
         }
     }
 }
