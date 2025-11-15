@@ -13,10 +13,10 @@ namespace Kiora\HealthCheckBundle\HealthCheck;
 readonly class HealthCheckResult
 {
     /**
-     * @param string $name Unique name identifying this health check
-     * @param HealthCheckStatus $status The health status result
-     * @param string $message Human-readable description of the result
-     * @param float $duration Execution time in seconds
+     * @param string               $name     Unique name identifying this health check
+     * @param HealthCheckStatus    $status   The health status result
+     * @param string               $message  Human-readable description of the result
+     * @param float                $duration Execution time in seconds
      * @param array<string, mixed> $metadata Additional contextual information
      */
     public function __construct(

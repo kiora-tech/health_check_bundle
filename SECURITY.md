@@ -14,7 +14,7 @@ We actively support the following versions with security updates:
 
 If you discover a security vulnerability, please report it by emailing:
 
-📧 **security@kiora.tech**
+📧 **<security@kiora.tech>**
 
 ### What to Include
 
@@ -86,6 +86,7 @@ framework:
 ### 3. Monitoring
 
 Monitor health check endpoints for:
+
 - Unusual access patterns
 - Excessive failed checks
 - Suspicious user agents
@@ -93,6 +94,7 @@ Monitor health check endpoints for:
 ### 4. Sensitive Information
 
 This bundle is designed to **never expose**:
+
 - Database credentials
 - Service versions
 - Internal paths
@@ -127,6 +129,7 @@ This bundle includes security features by default:
 ### Health Check Endpoint as Information Disclosure
 
 Health check endpoints can reveal:
+
 - Which services your application depends on (database, Redis, S3, etc.)
 - Whether those services are operational
 
@@ -137,6 +140,7 @@ Health check endpoints can reveal:
 Frequent health check requests can overload your services.
 
 **Mitigation**:
+
 - Use the `/ping` endpoint for liveness probes
 - Use the `/health` endpoint for readiness probes (less frequently)
 - Implement rate limiting
@@ -145,10 +149,10 @@ Frequent health check requests can overload your services.
 
 We appreciate security researchers who responsibly disclose vulnerabilities:
 
-*(No vulnerabilities reported yet)*
+No vulnerabilities reported yet.
 
 ## Questions?
 
 For security-related questions that are not vulnerabilities, please open a GitHub Discussion.
 
-For actual vulnerabilities, always use **security@kiora.tech**.
+For actual vulnerabilities, always use **<security@kiora.tech>**.

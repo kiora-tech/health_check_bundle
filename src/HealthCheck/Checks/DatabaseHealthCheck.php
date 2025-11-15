@@ -45,7 +45,7 @@ class DatabaseHealthCheck extends AbstractHealthCheck
             // Execute a simple query to verify connection
             $result = $this->connection->fetchOne('SELECT 1');
 
-            if ($result !== 1 && $result !== '1') {
+            if (1 !== $result && '1' !== $result) {
                 return new HealthCheckResult(
                     name: $this->getName(),
                     status: HealthCheckStatus::UNHEALTHY,

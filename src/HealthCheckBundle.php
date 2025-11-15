@@ -42,6 +42,6 @@ class HealthCheckBundle extends AbstractBundle
             $this->extension = new HealthCheckExtension();
         }
 
-        return $this->extension;
+        return $this->extension instanceof ExtensionInterface ? $this->extension : null;
     }
 }

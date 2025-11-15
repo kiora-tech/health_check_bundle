@@ -20,7 +20,7 @@ enum HealthCheckStatus: string
      */
     public function isHealthy(): bool
     {
-        return $this === self::HEALTHY;
+        return self::HEALTHY === $this;
     }
 
     /**
@@ -28,7 +28,7 @@ enum HealthCheckStatus: string
      */
     public function isUnhealthy(): bool
     {
-        return $this === self::UNHEALTHY;
+        return self::UNHEALTHY === $this;
     }
 
     /**
@@ -36,7 +36,7 @@ enum HealthCheckStatus: string
      */
     public function isDegraded(): bool
     {
-        return $this === self::DEGRADED;
+        return self::DEGRADED === $this;
     }
 
     /**

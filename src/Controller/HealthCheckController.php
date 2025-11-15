@@ -33,7 +33,7 @@ class HealthCheckController extends AbstractController
     {
         $results = $this->healthCheckService->runAllChecks();
 
-        $statusCode = $results['status'] === 'healthy' ? 200 : 503;
+        $statusCode = 'healthy' === $results['status'] ? 200 : 503;
 
         return new JsonResponse($results, $statusCode, [
             'X-Robots-Tag' => 'noindex, nofollow',
