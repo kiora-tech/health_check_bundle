@@ -50,5 +50,10 @@
         "branch-alias": {
             "dev-main": "1.0-dev"
         }
+    },
+    "config": {
+        "allow-plugins": {
+            "phpro/grumphp": true
+        }
     }
 }

@@ -14,6 +14,70 @@ A Symfony bundle providing comprehensive health check functionality for monitori
 - 🛡️ **Production Ready**: Rate limiting, security headers, generic error messages
 - 📊 **Standard Format**: JSON response with status, duration, and individual check results
 
+## Development with Docker
+
+The project includes a complete Docker environment for development and testing.
+
+### Quick Start
+
+```bash
+# Start all services (MySQL, PostgreSQL, Redis, MinIO)
+make up
+
+# Install dependencies
+make install
+
+# Run tests
+make test
+
+# Run PHPStan analysis
+make phpstan
+
+# Check code style
+make cs-check
+
+# Fix code style
+make cs-fix
+
+# Run all quality checks
+make check
+
+# Open a shell in PHP container
+make shell
+
+# Stop all services
+make down
+```
+
+### Available Services
+
+- **PHP 8.4** with all required extensions
+- **MySQL 8.0** on port 3306
+- **PostgreSQL 16** on port 5432
+- **Redis 7** on port 6379
+- **MinIO (S3-compatible)** on ports 9000 (API) and 9002 (Console)
+
+### Manual Commands
+
+If you prefer not to use Make:
+
+```bash
+# Start services
+docker compose up -d
+
+# Run tests
+docker compose exec php composer test
+
+# Run PHPStan
+docker compose exec php composer phpstan
+
+# Open shell
+docker compose exec php sh
+
+# Stop services
+docker compose down
+```
+
 ## Installation
 
 ### 1. Install the bundle
