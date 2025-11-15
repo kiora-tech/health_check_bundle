@@ -6,7 +6,6 @@ namespace Kiora\HealthCheckBundle\HealthCheck\Checks;
 
 use Kiora\HealthCheckBundle\HealthCheck\AbstractHealthCheck;
 use Kiora\HealthCheckBundle\HealthCheck\HealthCheckResult;
-use Kiora\HealthCheckBundle\HealthCheck\HealthCheckStatus;
 use League\Flysystem\FilesystemOperator;
 
 /**
@@ -59,21 +58,9 @@ class S3HealthCheck extends AbstractHealthCheck
             // Try to list files (limit to 1) to verify bucket access
             $this->filesystem->listContents('/', false)->toArray();
 
-            return new HealthCheckResult(
-                name: $this->getName(),
-                status: HealthCheckStatus::HEALTHY,
-                message: 'S3 storage operational',
-                duration: 0.0,
-                metadata: []
-            );
+            return $this->createHealthyResult('S3 storage operational');
         } catch (\Exception $e) {
-            return new HealthCheckResult(
-                name: $this->getName(),
-                status: HealthCheckStatus::UNHEALTHY,
-                message: 'S3 storage connection failed',
-                duration: 0.0,
-                metadata: []
-            );
+            return $this->createUnhealthyResult('S3 storage connection failed');
         }
     }
 }

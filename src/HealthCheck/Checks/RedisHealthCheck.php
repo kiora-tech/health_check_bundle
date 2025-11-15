@@ -6,7 +6,6 @@ namespace Kiora\HealthCheckBundle\HealthCheck\Checks;
 
 use Kiora\HealthCheckBundle\HealthCheck\AbstractHealthCheck;
 use Kiora\HealthCheckBundle\HealthCheck\HealthCheckResult;
-use Kiora\HealthCheckBundle\HealthCheck\HealthCheckStatus;
 
 /**
  * Health check for Redis connectivity.
@@ -62,13 +61,7 @@ class RedisHealthCheck extends AbstractHealthCheck
             $connected = @$redis->connect($this->host, $this->port, 2);
 
             if (!$connected) {
-                return new HealthCheckResult(
-                    name: $this->getName(),
-                    status: HealthCheckStatus::UNHEALTHY,
-                    message: 'Redis connection failed',
-                    duration: 0.0,
-                    metadata: []
-                );
+                return $this->createUnhealthyResult('Redis connection failed');
             }
 
             // Send PING command to Redis
@@ -81,30 +74,12 @@ class RedisHealthCheck extends AbstractHealthCheck
                 || 'PONG' === $response;
 
             if (!$isPongValid) {
-                return new HealthCheckResult(
-                    name: $this->getName(),
-                    status: HealthCheckStatus::UNHEALTHY,
-                    message: 'Redis ping failed',
-                    duration: 0.0,
-                    metadata: []
-                );
+                return $this->createUnhealthyResult('Redis ping failed');
             }
 
-            return new HealthCheckResult(
-                name: $this->getName(),
-                status: HealthCheckStatus::HEALTHY,
-                message: 'Redis operational',
-                duration: 0.0,
-                metadata: []
-            );
+            return $this->createHealthyResult('Redis operational');
         } catch (\Exception $e) {
-            return new HealthCheckResult(
-                name: $this->getName(),
-                status: HealthCheckStatus::UNHEALTHY,
-                message: 'Redis connection failed',
-                duration: 0.0,
-                metadata: []
-            );
+            return $this->createUnhealthyResult('Redis connection failed');
         } finally {
             // Close Redis connection if it was established
             if ($redis instanceof \Redis) {

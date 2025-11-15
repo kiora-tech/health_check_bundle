@@ -80,4 +80,64 @@ abstract class AbstractHealthCheck implements HealthCheckInterface
      * in the returned result.
      */
     abstract protected function doCheck(): HealthCheckResult;
+
+    /**
+     * Create a healthy result.
+     *
+     * Factory method to reduce code duplication when creating healthy results.
+     * Duration will be automatically calculated by check(), so it's set to 0.0.
+     *
+     * @param string               $message  Human-readable success message
+     * @param array<string, mixed> $metadata Additional contextual information
+     */
+    protected function createHealthyResult(string $message, array $metadata = []): HealthCheckResult
+    {
+        return new HealthCheckResult(
+            name: $this->getName(),
+            status: HealthCheckStatus::HEALTHY,
+            message: $message,
+            duration: 0.0,
+            metadata: $metadata
+        );
+    }
+
+    /**
+     * Create an unhealthy result.
+     *
+     * Factory method to reduce code duplication when creating unhealthy results.
+     * Duration will be automatically calculated by check(), so it's set to 0.0.
+     *
+     * @param string               $message  Human-readable error message
+     * @param array<string, mixed> $metadata Additional contextual information
+     */
+    protected function createUnhealthyResult(string $message, array $metadata = []): HealthCheckResult
+    {
+        return new HealthCheckResult(
+            name: $this->getName(),
+            status: HealthCheckStatus::UNHEALTHY,
+            message: $message,
+            duration: 0.0,
+            metadata: $metadata
+        );
+    }
+
+    /**
+     * Create a degraded result.
+     *
+     * Factory method to reduce code duplication when creating degraded results.
+     * Duration will be automatically calculated by check(), so it's set to 0.0.
+     *
+     * @param string               $message  Human-readable warning message
+     * @param array<string, mixed> $metadata Additional contextual information
+     */
+    protected function createDegradedResult(string $message, array $metadata = []): HealthCheckResult
+    {
+        return new HealthCheckResult(
+            name: $this->getName(),
+            status: HealthCheckStatus::DEGRADED,
+            message: $message,
+            duration: 0.0,
+            metadata: $metadata
+        );
+    }
 }
