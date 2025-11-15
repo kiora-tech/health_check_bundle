@@ -6,7 +6,6 @@ namespace Kiora\HealthCheckBundle\HealthCheck\Checks;
 
 use Kiora\HealthCheckBundle\HealthCheck\AbstractHealthCheck;
 use Kiora\HealthCheckBundle\HealthCheck\HealthCheckResult;
-use Kiora\HealthCheckBundle\HealthCheck\HealthCheckStatus;
 
 /**
  * Health check for HTTP endpoints.
@@ -72,13 +71,7 @@ class HttpHealthCheck extends AbstractHealthCheck
             $response = @file_get_contents($this->url, false, $context);
 
             if (false === $response) {
-                return new HealthCheckResult(
-                    name: $this->getName(),
-                    status: HealthCheckStatus::UNHEALTHY,
-                    message: 'HTTP endpoint unreachable',
-                    duration: 0.0,
-                    metadata: []
-                );
+                return $this->createUnhealthyResult('HTTP endpoint unreachable');
             }
 
             // Parse HTTP response code
@@ -91,30 +84,12 @@ class HttpHealthCheck extends AbstractHealthCheck
 
             // Check if status code is expected
             if (!in_array($statusCode, $this->expectedStatusCodes, true)) {
-                return new HealthCheckResult(
-                    name: $this->getName(),
-                    status: HealthCheckStatus::UNHEALTHY,
-                    message: 'HTTP endpoint returned unexpected status',
-                    duration: 0.0,
-                    metadata: []
-                );
+                return $this->createUnhealthyResult('HTTP endpoint returned unexpected status');
             }
 
-            return new HealthCheckResult(
-                name: $this->getName(),
-                status: HealthCheckStatus::HEALTHY,
-                message: 'HTTP endpoint operational',
-                duration: 0.0,
-                metadata: []
-            );
+            return $this->createHealthyResult('HTTP endpoint operational');
         } catch (\Exception $e) {
-            return new HealthCheckResult(
-                name: $this->getName(),
-                status: HealthCheckStatus::UNHEALTHY,
-                message: 'HTTP check failed',
-                duration: 0.0,
-                metadata: []
-            );
+            return $this->createUnhealthyResult('HTTP check failed');
         }
     }
 }

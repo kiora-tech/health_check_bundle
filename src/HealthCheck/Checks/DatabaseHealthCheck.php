@@ -7,7 +7,6 @@ namespace Kiora\HealthCheckBundle\HealthCheck\Checks;
 use Doctrine\DBAL\Connection;
 use Kiora\HealthCheckBundle\HealthCheck\AbstractHealthCheck;
 use Kiora\HealthCheckBundle\HealthCheck\HealthCheckResult;
-use Kiora\HealthCheckBundle\HealthCheck\HealthCheckStatus;
 
 /**
  * Health check for database connectivity using Doctrine DBAL.
@@ -62,30 +61,12 @@ class DatabaseHealthCheck extends AbstractHealthCheck
             $result = $this->connection->fetchOne('SELECT 1');
 
             if (1 !== $result && '1' !== $result) {
-                return new HealthCheckResult(
-                    name: $this->getName(),
-                    status: HealthCheckStatus::UNHEALTHY,
-                    message: 'Database query failed',
-                    duration: 0.0,
-                    metadata: []
-                );
+                return $this->createUnhealthyResult('Database query failed');
             }
 
-            return new HealthCheckResult(
-                name: $this->getName(),
-                status: HealthCheckStatus::HEALTHY,
-                message: 'Database operational',
-                duration: 0.0,
-                metadata: []
-            );
+            return $this->createHealthyResult('Database operational');
         } catch (\Exception $e) {
-            return new HealthCheckResult(
-                name: $this->getName(),
-                status: HealthCheckStatus::UNHEALTHY,
-                message: 'Database connection failed',
-                duration: 0.0,
-                metadata: []
-            );
+            return $this->createUnhealthyResult('Database connection failed');
         }
     }
 }
