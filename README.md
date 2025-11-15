@@ -202,10 +202,12 @@ services:
 ```
 
 **Naming Convention:**
+
 - Default connection: Returns `database`
 - Named connections: Returns `database_{name}` (e.g., `database_analytics`, `database_logs`)
 
 **Configuration Options:**
+
 - `$name`: Connection identifier (default: `'default'`)
 - `$critical`: Whether failure should return HTTP 503 (default: `true`)
 - `$groups`: Contexts where this check runs (default: `[]` = all contexts)
@@ -424,6 +426,7 @@ services:
 #### Use Cases
 
 **Kubernetes Probes:**
+
 ```yaml
 # Web pod - check only web-related services
 livenessProbe:
@@ -439,12 +442,14 @@ livenessProbe:
 ```
 
 **Console Commands:**
+
 ```bash
 # Check services needed for console commands
 php bin/console app:health-check --group=console
 ```
 
 **Monitoring Different Environments:**
+
 ```bash
 # Production web servers - check critical web services
 curl https://prod.example.com/health?group=web
@@ -545,6 +550,7 @@ services:
 **How it works**: All classes implementing `HealthCheckInterface` are automatically tagged with `health_check.checker` thanks to the `#[AutoconfigureTag]` attribute on the interface. No manual tagging needed!
 
 **Configuration Options:**
+
 - `$critical`: Set to `true` if this check's failure should return HTTP 503 (default: `false`)
 - `$groups`: Array of group names this check belongs to (default: `[]` = all groups)
 

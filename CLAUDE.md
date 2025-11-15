@@ -76,21 +76,25 @@ composer qa
 
 ### Core Components
 
-**Value Objects**
+#### Value Objects
+
 - `HealthCheckStatus`: Enum (healthy/degraded/unhealthy) with helper methods
 - `HealthCheckResult`: Readonly class containing check results (immutable)
 
-**Service Layer**
+#### Service Layer
+
 - `HealthCheckInterface`: Contract with `#[AutoconfigureTag('health_check.checker')]` for automatic service discovery
 - `AbstractHealthCheck`: Template Method pattern - provides timeout management, duration measurement, exception handling
 - Concrete checks: `DatabaseHealthCheck`, `RedisHealthCheck`, `S3HealthCheck`, `HttpHealthCheck`
 
-**Orchestration**
+#### Orchestration
+
 - `HealthCheckService`: Aggregates all checks via tagged iterator, determines overall status
 - `HealthCheckController`: `/health` endpoint - returns 200 for healthy, 503 for unhealthy
 - `PingController`: `/ping` endpoint - lightweight liveness probe (always returns 200)
 
-**DI Container**
+#### DI Container
+
 - `HealthCheckPass`: Compiler pass that collects tagged services
 - `HealthCheckExtension`: Loads services and configuration
 
@@ -124,6 +128,7 @@ Checks can be marked critical via `isCritical()`. If ANY critical check fails, t
 ### GrumPHP
 
 Pre-commit hooks run automatically:
+
 - PHPUnit tests
 - PHPStan analysis
 - PHP-CS-Fixer
@@ -210,7 +215,7 @@ class CustomCheck extends AbstractHealthCheck
 }
 ```
 
-2. **Register in services.yaml**:
+1. **Register in services.yaml**:
 
 ```yaml
 services:
