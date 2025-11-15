@@ -56,6 +56,20 @@ abstract class AbstractHealthCheck implements HealthCheckInterface
     }
 
     /**
+     * Get the groups this check belongs to.
+     *
+     * By default, returns an empty array which means the check belongs
+     * to all groups (no filtering). Override this method to assign
+     * specific groups.
+     *
+     * @return string[] Array of group names
+     */
+    public function getGroups(): array
+    {
+        return [];
+    }
+
+    /**
      * Perform the actual health check logic.
      *
      * This method is called by check() and is wrapped with timeout

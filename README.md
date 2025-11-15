@@ -10,6 +10,8 @@ A Symfony bundle providing comprehensive health check functionality for monitori
 ## Features
 
 - 🔍 **Multiple Health Checks**: Database, Redis, S3/MinIO, HTTP endpoints
+- 🗂️ **Multiple Connections**: Support for multiple database connections (read/write replicas, analytics, logs)
+- 🏷️ **Check Groups**: Filter health checks by context (web, worker, console) via `?group=` parameter
 - 🔒 **Security First**: No sensitive information exposed (versions, paths, credentials)
 - ⚡ **Performance**: Configurable timeouts, non-blocking checks
 - 🎯 **Flexible**: Critical vs non-critical checks, enable/disable per check
@@ -169,6 +171,47 @@ health_check:
 
 No additional configuration needed. Works out of the box with your existing Doctrine configuration.
 
+##### Multiple Database Connections
+
+If your application uses multiple database connections (e.g., read/write replicas, analytics database, logs database), you can configure separate health checks for each connection:
+
+```yaml
+services:
+    # Default connection (automatically registered)
+    # Already available as 'database' check
+
+    # Analytics database (read-only replica)
+    app.health_check.database_analytics:
+        class: Kiora\HealthCheckBundle\HealthCheck\Checks\DatabaseHealthCheck
+        autoconfigure: true
+        arguments:
+            $connection: '@doctrine.dbal.analytics_connection'
+            $name: 'analytics'
+            $critical: false  # Non-critical: analytics can be down without affecting main app
+            $groups: ['worker', 'cron']  # Only check in worker/cron contexts
+
+    # Logs database
+    app.health_check.database_logs:
+        class: Kiora\HealthCheckBundle\HealthCheck\Checks\DatabaseHealthCheck
+        autoconfigure: true
+        arguments:
+            $connection: '@doctrine.dbal.logs_connection'
+            $name: 'logs'
+            $critical: false  # Non-critical: logging can fail without affecting main app
+            $groups: ['web', 'worker']  # Check in both web and worker contexts
+```
+
+**Naming Convention:**
+
+- Default connection: Returns `database`
+- Named connections: Returns `database_{name}` (e.g., `database_analytics`, `database_logs`)
+
+**Configuration Options:**
+
+- `$name`: Connection identifier (default: `'default'`)
+- `$critical`: Whether failure should return HTTP 503 (default: `true`)
+- `$groups`: Contexts where this check runs (default: `[]` = all contexts)
+
 #### 2. Redis Check (Manual setup)
 
 ⚙️ **Disabled by default** - Only configure if your project uses Redis.
@@ -318,6 +361,103 @@ curl http://localhost/health
 - `unhealthy`: Check failed
 - `degraded`: Check passed with warnings (reserved for future use)
 
+### Filtering Checks by Group
+
+Health checks can be organized into groups/contexts (e.g., `web`, `worker`, `console`) to enable granular monitoring based on the application context.
+
+#### Using the Group Query Parameter
+
+Filter health checks by group using the `?group=` query parameter:
+
+```bash
+# Check only web-related services
+curl http://localhost/health?group=web
+
+# Check only worker/background job services
+curl http://localhost/health?group=worker
+
+# Check only console/CLI services
+curl http://localhost/health?group=console
+```
+
+#### Configuring Groups
+
+Assign groups to health checks in your service configuration:
+
+```yaml
+services:
+    # Database check - runs in all contexts (no groups specified)
+    Kiora\HealthCheckBundle\HealthCheck\Checks\DatabaseHealthCheck:
+        autoconfigure: true
+        arguments:
+            $connection: '@doctrine.dbal.default_connection'
+            $name: 'default'
+            $critical: true
+            $groups: []  # Empty = belongs to all groups
+
+    # Redis check - only for web and worker contexts
+    Kiora\HealthCheckBundle\HealthCheck\Checks\RedisHealthCheck:
+        autoconfigure: true
+        arguments:
+            $host: '%env(REDIS_HOST)%'
+            $port: '%env(int:REDIS_PORT)%'
+            $critical: false
+            $groups: ['web', 'worker']  # Only runs when ?group=web or ?group=worker
+
+    # External API check - only for web context
+    app.health_check.external_api:
+        class: Kiora\HealthCheckBundle\HealthCheck\Checks\HttpHealthCheck
+        autoconfigure: true
+        arguments:
+            $url: 'https://api.example.com/health'
+            $name: 'external_api'
+            $timeout: 5
+            $critical: false
+            $expectedStatusCodes: [200]
+            $groups: ['web']  # Only runs when ?group=web
+```
+
+#### Group Filtering Behavior
+
+- **Empty groups** (`$groups: []`): Check runs in **all contexts** (no filtering)
+- **Specified groups** (`$groups: ['web', 'worker']`): Check runs only when requested group matches
+- **No group parameter**: All checks run (default behavior)
+
+#### Use Cases
+
+**Kubernetes Probes:**
+
+```yaml
+# Web pod - check only web-related services
+livenessProbe:
+  httpGet:
+    path: /health?group=web
+    port: 80
+
+# Worker pod - check only worker-related services
+livenessProbe:
+  httpGet:
+    path: /health?group=worker
+    port: 80
+```
+
+**Console Commands:**
+
+```bash
+# Check services needed for console commands
+php bin/console app:health-check --group=console
+```
+
+**Monitoring Different Environments:**
+
+```bash
+# Production web servers - check critical web services
+curl https://prod.example.com/health?group=web
+
+# Background workers - check queue and batch processing services
+curl https://worker.example.com/health?group=worker
+```
+
 ## Creating Custom Health Checks
 
 ### 1. Create your check class
@@ -335,6 +475,12 @@ use Kiora\HealthCheckBundle\HealthCheck\HealthCheckStatus;
 
 class CustomHealthCheck extends AbstractHealthCheck
 {
+    public function __construct(
+        private readonly bool $critical = false,
+        private readonly array $groups = []
+    ) {
+    }
+
     public function getName(): string
     {
         return 'custom';
@@ -347,7 +493,12 @@ class CustomHealthCheck extends AbstractHealthCheck
 
     public function isCritical(): bool
     {
-        return false; // Set to true if failure should return 503
+        return $this->critical;
+    }
+
+    public function getGroups(): array
+    {
+        return $this->groups;
     }
 
     protected function doCheck(): HealthCheckResult
@@ -386,11 +537,22 @@ services:
         autowire: true
         autoconfigure: true
 
+    # Simple registration (uses defaults: non-critical, no groups)
     App\HealthCheck\CustomHealthCheck: ~
-    # That's it! The service is automatically tagged with 'health_check.checker'
+
+    # With configuration
+    App\HealthCheck\CustomHealthCheck:
+        arguments:
+            $critical: true  # Mark as critical
+            $groups: ['web', 'worker']  # Specify groups
 ```
 
 **How it works**: All classes implementing `HealthCheckInterface` are automatically tagged with `health_check.checker` thanks to the `#[AutoconfigureTag]` attribute on the interface. No manual tagging needed!
+
+**Configuration Options:**
+
+- `$critical`: Set to `true` if this check's failure should return HTTP 503 (default: `false`)
+- `$groups`: Array of group names this check belongs to (default: `[]` = all groups)
 
 ## Security Considerations
 
@@ -586,6 +748,18 @@ This bundle is released under the [MIT License](LICENSE).
 Created and maintained by [Kiora Tech](https://kiora.tech).
 
 ## Changelog
+
+### Unreleased
+
+- **Multiple Database Connections**: Support for monitoring multiple Doctrine DBAL connections
+  - Named connections with custom identifiers (e.g., `database_analytics`, `database_logs`)
+  - Per-connection criticality configuration
+  - Backward compatible with existing single connection setup
+- **Health Check Groups**: Filter checks by context/group for granular monitoring
+  - Query parameter support: `?group=web`, `?group=worker`, `?group=console`
+  - Per-check group assignment
+  - Empty groups = belongs to all contexts (default behavior)
+- Comprehensive test suite with 31 tests and 86 assertions
 
 ### 1.0.0 (2025-11-06)
 

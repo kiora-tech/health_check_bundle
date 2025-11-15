@@ -19,18 +19,20 @@ use Kiora\HealthCheckBundle\HealthCheck\HealthCheckStatus;
 class HttpHealthCheck extends AbstractHealthCheck
 {
     /**
-     * @param string $url                 The URL to check
-     * @param string $name                Optional custom name for this check
-     * @param int    $timeout             Timeout in seconds
-     * @param bool   $critical            Whether this check is critical
-     * @param int[]  $expectedStatusCodes Expected HTTP status codes (default: 200, 201, 204)
+     * @param string   $url                 The URL to check
+     * @param string   $name                Optional custom name for this check
+     * @param int      $timeout             Timeout in seconds
+     * @param bool     $critical            Whether this check is critical
+     * @param int[]    $expectedStatusCodes Expected HTTP status codes (default: 200, 201, 204)
+     * @param string[] $groups              Groups this check belongs to (e.g., ['web', 'worker'])
      */
     public function __construct(
         private readonly string $url,
         private readonly string $name = 'http_endpoint',
         private readonly int $timeout = 5,
         private readonly bool $critical = false,
-        private readonly array $expectedStatusCodes = [200, 201, 204]
+        private readonly array $expectedStatusCodes = [200, 201, 204],
+        private readonly array $groups = []
     ) {
     }
 
@@ -47,6 +49,11 @@ class HttpHealthCheck extends AbstractHealthCheck
     public function isCritical(): bool
     {
         return $this->critical;
+    }
+
+    public function getGroups(): array
+    {
+        return $this->groups;
     }
 
     protected function doCheck(): HealthCheckResult

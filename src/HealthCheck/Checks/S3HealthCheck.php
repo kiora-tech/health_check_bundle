@@ -23,11 +23,13 @@ class S3HealthCheck extends AbstractHealthCheck
      * @param FilesystemOperator $filesystem Flysystem filesystem instance
      * @param string             $name       Optional custom name for this check
      * @param bool               $critical   Whether this check is critical
+     * @param string[]           $groups     Groups this check belongs to (e.g., ['web', 'worker'])
      */
     public function __construct(
         private readonly FilesystemOperator $filesystem,
         private readonly string $name = 's3',
-        private readonly bool $critical = false
+        private readonly bool $critical = false,
+        private readonly array $groups = []
     ) {
     }
 
@@ -44,6 +46,11 @@ class S3HealthCheck extends AbstractHealthCheck
     public function isCritical(): bool
     {
         return $this->critical;
+    }
+
+    public function getGroups(): array
+    {
+        return $this->groups;
     }
 
     protected function doCheck(): HealthCheckResult

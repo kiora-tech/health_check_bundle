@@ -19,14 +19,16 @@ use Kiora\HealthCheckBundle\HealthCheck\HealthCheckStatus;
 class RedisHealthCheck extends AbstractHealthCheck
 {
     /**
-     * @param string $host     Redis host
-     * @param int    $port     Redis port
-     * @param bool   $critical Whether this check is critical
+     * @param string   $host     Redis host
+     * @param int      $port     Redis port
+     * @param bool     $critical Whether this check is critical
+     * @param string[] $groups   Groups this check belongs to (e.g., ['web', 'worker'])
      */
     public function __construct(
         private readonly string $host = 'localhost',
         private readonly int $port = 6379,
-        private readonly bool $critical = false
+        private readonly bool $critical = false,
+        private readonly array $groups = []
     ) {
     }
 
@@ -43,6 +45,11 @@ class RedisHealthCheck extends AbstractHealthCheck
     public function isCritical(): bool
     {
         return $this->critical;
+    }
+
+    public function getGroups(): array
+    {
+        return $this->groups;
     }
 
     protected function doCheck(): HealthCheckResult
