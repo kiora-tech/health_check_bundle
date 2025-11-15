@@ -50,7 +50,14 @@ class PingControllerTest extends TestCase
 
         $this->assertEquals('noindex, nofollow', $response->headers->get('X-Robots-Tag'));
         $this->assertEquals('nosniff', $response->headers->get('X-Content-Type-Options'));
-        $this->assertEquals('no-store, no-cache, must-revalidate, private', $response->headers->get('Cache-Control'));
+
+        // Verify Cache-Control contains all required directives (order doesn't matter)
+        $cacheControl = $response->headers->get('Cache-Control');
+        $this->assertNotNull($cacheControl);
+        $this->assertStringContainsString('no-store', $cacheControl);
+        $this->assertStringContainsString('no-cache', $cacheControl);
+        $this->assertStringContainsString('must-revalidate', $cacheControl);
+        $this->assertStringContainsString('private', $cacheControl);
     }
 
     public function testPingDoesNotRequireExternalDependencies(): void

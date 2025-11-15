@@ -21,8 +21,8 @@ class S3HealthCheck extends AbstractHealthCheck
 {
     /**
      * @param FilesystemOperator $filesystem Flysystem filesystem instance
-     * @param string $name Optional custom name for this check
-     * @param bool $critical Whether this check is critical
+     * @param string             $name       Optional custom name for this check
+     * @param bool               $critical   Whether this check is critical
      */
     public function __construct(
         private readonly FilesystemOperator $filesystem,

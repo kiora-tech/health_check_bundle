@@ -2,8 +2,10 @@
 
 A Symfony bundle providing comprehensive health check functionality for monitoring application dependencies and services.
 
-[![PHP Version](https://img.shields.io/badge/php-%3E%3D8.2-blue)](https://www.php.net/)
+[![CI](https://github.com/kiora-tech/health_check_bundle/actions/workflows/ci.yml/badge.svg)](https://github.com/kiora-tech/health_check_bundle/actions/workflows/ci.yml)
+[![PHP Version](https://img.shields.io/badge/php-%3E%3D8.3-blue)](https://www.php.net/)
 [![Symfony Version](https://img.shields.io/badge/symfony-%5E6.4%7C%5E7.0-green)](https://symfony.com/)
+[![License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
 
 ## Features
 
@@ -13,6 +15,70 @@ A Symfony bundle providing comprehensive health check functionality for monitori
 - 🎯 **Flexible**: Critical vs non-critical checks, enable/disable per check
 - 🛡️ **Production Ready**: Rate limiting, security headers, generic error messages
 - 📊 **Standard Format**: JSON response with status, duration, and individual check results
+
+## Development with Docker
+
+The project includes a complete Docker environment for development and testing.
+
+### Quick Start
+
+```bash
+# Start all services (MySQL, PostgreSQL, Redis, MinIO)
+make up
+
+# Install dependencies
+make install
+
+# Run tests
+make test
+
+# Run PHPStan analysis
+make phpstan
+
+# Check code style
+make cs-check
+
+# Fix code style
+make cs-fix
+
+# Run all quality checks
+make check
+
+# Open a shell in PHP container
+make shell
+
+# Stop all services
+make down
+```
+
+### Available Services
+
+- **PHP 8.4** with all required extensions
+- **MySQL 8.0** on port 3306
+- **PostgreSQL 16** on port 5432
+- **Redis 7** on port 6379
+- **MinIO (S3-compatible)** on ports 9000 (API) and 9002 (Console)
+
+### Manual Commands
+
+If you prefer not to use Make:
+
+```bash
+# Start services
+docker compose up -d
+
+# Run tests
+docker compose exec php composer test
+
+# Run PHPStan
+docker compose exec php composer phpstan
+
+# Open shell
+docker compose exec php sh
+
+# Stop services
+docker compose down
+```
 
 ## Installation
 
@@ -192,7 +258,7 @@ services:
             $expectedStatusCodes: [200, 401]  # 401 = API accessible but auth required
 ```
 
-**Example: Microsoft Graph API**
+#### Example: Microsoft Graph API
 
 ```yaml
 services:
