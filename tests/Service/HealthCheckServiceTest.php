@@ -125,6 +125,225 @@ class HealthCheckServiceTest extends TestCase
         $this->assertSame('healthy', $results['status']); // Still healthy because failed check is non-critical
     }
 
+    public function testCacheHitPreventsDoubleExecution(): void
+    {
+        $callCount = 0;
+        $check = $this->createMock(HealthCheckInterface::class);
+        $check->method('getName')->willReturn('test_check');
+        $check->method('getGroups')->willReturn([]);
+        $check->method('isCritical')->willReturn(true);
+        $check->method('getTimeout')->willReturn(5);
+        $check->method('check')->willReturnCallback(function () use (&$callCount) {
+            ++$callCount;
+
+            return new HealthCheckResult(
+                name: 'test_check',
+                status: HealthCheckStatus::HEALTHY,
+                message: 'Test message',
+                duration: 0.0,
+                metadata: []
+            );
+        });
+
+        $service = new HealthCheckService([$check]);
+
+        // First call should execute the check
+        $service->runAllChecks();
+        $this->assertSame(1, $callCount, 'First call should execute the check');
+
+        // Second call should use cache
+        $service->runAllChecks();
+        $this->assertSame(1, $callCount, 'Second call should use cached results');
+
+        // getHealthStatus should also use cache
+        $service->getHealthStatus();
+        $this->assertSame(1, $callCount, 'getHealthStatus should use cached results');
+    }
+
+    public function testCacheExpiresAfterTTL(): void
+    {
+        $callCount = 0;
+        $check = $this->createMock(HealthCheckInterface::class);
+        $check->method('getName')->willReturn('test_check');
+        $check->method('getGroups')->willReturn([]);
+        $check->method('isCritical')->willReturn(true);
+        $check->method('getTimeout')->willReturn(5);
+        $check->method('check')->willReturnCallback(function () use (&$callCount) {
+            ++$callCount;
+
+            return new HealthCheckResult(
+                name: 'test_check',
+                status: HealthCheckStatus::HEALTHY,
+                message: 'Test message',
+                duration: 0.0,
+                metadata: []
+            );
+        });
+
+        $service = new HealthCheckService([$check]);
+
+        // First call
+        $service->runAllChecks();
+        $this->assertSame(1, $callCount);
+
+        // Wait for cache to expire (1 second + small buffer)
+        usleep(1100000); // 1.1 seconds
+
+        // Should execute again after cache expiration
+        $service->runAllChecks();
+        $this->assertSame(2, $callCount, 'Check should execute again after cache expiration');
+    }
+
+    public function testCacheBypassWithUseCacheFalse(): void
+    {
+        $callCount = 0;
+        $check = $this->createMock(HealthCheckInterface::class);
+        $check->method('getName')->willReturn('test_check');
+        $check->method('getGroups')->willReturn([]);
+        $check->method('isCritical')->willReturn(true);
+        $check->method('getTimeout')->willReturn(5);
+        $check->method('check')->willReturnCallback(function () use (&$callCount) {
+            ++$callCount;
+
+            return new HealthCheckResult(
+                name: 'test_check',
+                status: HealthCheckStatus::HEALTHY,
+                message: 'Test message',
+                duration: 0.0,
+                metadata: []
+            );
+        });
+
+        $service = new HealthCheckService([$check]);
+
+        // First call with cache enabled
+        $service->runAllChecks(null, true);
+        $this->assertSame(1, $callCount);
+
+        // Second call with cache disabled should execute again
+        $service->runAllChecks(null, false);
+        $this->assertSame(2, $callCount, 'useCache=false should bypass cache');
+
+        // Third call with cache enabled should use fresh cache from second call
+        $service->runAllChecks(null, true);
+        $this->assertSame(2, $callCount, 'Cache should be available from previous call');
+    }
+
+    public function testGetHealthStatusUsesCachedResults(): void
+    {
+        $callCount = 0;
+        $check = $this->createMock(HealthCheckInterface::class);
+        $check->method('getName')->willReturn('test_check');
+        $check->method('getGroups')->willReturn([]);
+        $check->method('isCritical')->willReturn(true);
+        $check->method('getTimeout')->willReturn(5);
+        $check->method('check')->willReturnCallback(function () use (&$callCount) {
+            ++$callCount;
+
+            return new HealthCheckResult(
+                name: 'test_check',
+                status: HealthCheckStatus::HEALTHY,
+                message: 'Test message',
+                duration: 0.0,
+                metadata: []
+            );
+        });
+
+        $service = new HealthCheckService([$check]);
+
+        // Populate cache
+        $service->runAllChecks();
+        $this->assertSame(1, $callCount);
+
+        // getHealthStatus should use cache
+        $status = $service->getHealthStatus();
+        $this->assertSame(HealthCheckStatus::HEALTHY, $status);
+        $this->assertSame(1, $callCount, 'getHealthStatus should not execute checks when cache is available');
+    }
+
+    public function testGetHealthStatusBypassesCacheWhenRequested(): void
+    {
+        $callCount = 0;
+        $check = $this->createMock(HealthCheckInterface::class);
+        $check->method('getName')->willReturn('test_check');
+        $check->method('getGroups')->willReturn([]);
+        $check->method('isCritical')->willReturn(true);
+        $check->method('getTimeout')->willReturn(5);
+        $check->method('check')->willReturnCallback(function () use (&$callCount) {
+            ++$callCount;
+
+            return new HealthCheckResult(
+                name: 'test_check',
+                status: HealthCheckStatus::HEALTHY,
+                message: 'Test message',
+                duration: 0.0,
+                metadata: []
+            );
+        });
+
+        $service = new HealthCheckService([$check]);
+
+        // Populate cache
+        $service->runAllChecks();
+        $this->assertSame(1, $callCount);
+
+        // getHealthStatus with useCache=false should execute checks
+        $status = $service->getHealthStatus(false);
+        $this->assertSame(HealthCheckStatus::HEALTHY, $status);
+        $this->assertSame(2, $callCount, 'getHealthStatus with useCache=false should execute checks');
+    }
+
+    public function testCacheReturnsCorrectUnhealthyStatus(): void
+    {
+        $check1 = $this->createMockCheck('healthy_check', [], HealthCheckStatus::HEALTHY, true);
+        $check2 = $this->createMockCheck('unhealthy_check', [], HealthCheckStatus::UNHEALTHY, true);
+
+        $service = new HealthCheckService([$check1, $check2]);
+
+        // Populate cache
+        $results = $service->runAllChecks();
+        $this->assertSame('unhealthy', $results['status']);
+
+        // getHealthStatus should return unhealthy from cache
+        $status = $service->getHealthStatus();
+        $this->assertSame(HealthCheckStatus::UNHEALTHY, $status);
+    }
+
+    public function testGroupFilterDoesNotUseCache(): void
+    {
+        $callCount = 0;
+        $check = $this->createMock(HealthCheckInterface::class);
+        $check->method('getName')->willReturn('test_check');
+        $check->method('getGroups')->willReturn(['web']);
+        $check->method('isCritical')->willReturn(true);
+        $check->method('getTimeout')->willReturn(5);
+        $check->method('check')->willReturnCallback(function () use (&$callCount) {
+            ++$callCount;
+
+            return new HealthCheckResult(
+                name: 'test_check',
+                status: HealthCheckStatus::HEALTHY,
+                message: 'Test message',
+                duration: 0.0,
+                metadata: []
+            );
+        });
+
+        $service = new HealthCheckService([$check]);
+
+        // First call without group filter (should cache)
+        $service->runAllChecks();
+        $this->assertSame(1, $callCount);
+
+        // Call with group filter should not use cache and should execute
+        $service->runAllChecks('web');
+        $this->assertSame(2, $callCount, 'Group filter should bypass cache');
+
+        // Another call without group should use original cache
+        $service->runAllChecks();
+        $this->assertSame(2, $callCount, 'Call without group should use cache');
+    }
+
     private function createMockCheck(
         string $name,
         array $groups,

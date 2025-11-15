@@ -17,6 +17,18 @@ use Kiora\HealthCheckBundle\HealthCheck\HealthCheckStatus;
 class HealthCheckService
 {
     /**
+     * Cache TTL in seconds to prevent duplicate health check executions.
+     */
+    private const CACHE_TTL = 1;
+
+    /**
+     * @var array<int, HealthCheckResult>|null
+     */
+    private ?array $cachedResults = null;
+
+    private ?float $cacheTimestamp = null;
+
+    /**
      * @param iterable<HealthCheckInterface> $healthChecks
      */
     public function __construct(
@@ -27,28 +39,47 @@ class HealthCheckService
     /**
      * Execute all registered health checks, optionally filtered by group.
      *
-     * @param string|null $group Optional group filter (e.g., 'web', 'worker', 'console')
+     * @param string|null $group    Optional group filter (e.g., 'web', 'worker', 'console')
+     * @param bool        $useCache Whether to use cached results if available (default: true)
      *
      * @return array{status: string, timestamp: string, duration: float, checks: array<int, array<string, mixed>>}
      */
-    public function runAllChecks(?string $group = null): array
+    public function runAllChecks(?string $group = null, bool $useCache = true): array
     {
         $startTime = microtime(true);
-        $results = [];
-        $overallStatus = HealthCheckStatus::HEALTHY;
 
-        foreach ($this->healthChecks as $healthCheck) {
-            // Filter by group if specified
-            if (null !== $group && !$this->checkBelongsToGroup($healthCheck, $group)) {
-                continue;
+        // Check if cache is fresh and should be used
+        if ($useCache && $this->isCacheFresh() && null === $group && null !== $this->cachedResults) {
+            $results = $this->cachedResults;
+        } else {
+            $results = [];
+
+            foreach ($this->healthChecks as $healthCheck) {
+                // Filter by group if specified
+                if (null !== $group && !$this->checkBelongsToGroup($healthCheck, $group)) {
+                    continue;
+                }
+
+                $result = $healthCheck->check();
+                $results[] = $result;
             }
 
-            $result = $healthCheck->check();
-            $results[] = $result;
+            // Cache results only when no group filter is applied
+            if (null === $group) {
+                $this->cachedResults = $results;
+                $this->cacheTimestamp = microtime(true);
+            }
+        }
 
-            // Determine overall status: if any critical check fails, mark as unhealthy
-            if ($result->isUnhealthy() && $healthCheck->isCritical()) {
+        // Recalculate overall status from results
+        $overallStatus = HealthCheckStatus::HEALTHY;
+        $healthCheckArray = iterator_to_array($this->healthChecks);
+        foreach ($results as $index => $result) {
+            $healthCheck = $healthCheckArray[$index] ?? null;
+            if (null !== $healthCheck && $result->isUnhealthy() && $healthCheck->isCritical()) {
                 $overallStatus = HealthCheckStatus::UNHEALTHY;
+
+                break;
             }
         }
 
@@ -88,9 +119,26 @@ class HealthCheckService
      * Get the overall health status.
      *
      * Returns the appropriate HTTP status code based on health check results.
+     * Uses cached results if available to avoid re-executing checks.
+     *
+     * @param bool $useCache Whether to use cached results if available (default: true)
      */
-    public function getHealthStatus(): HealthCheckStatus
+    public function getHealthStatus(bool $useCache = true): HealthCheckStatus
     {
+        // Use cached results if available and fresh
+        if ($useCache && $this->isCacheFresh() && null !== $this->cachedResults) {
+            $healthCheckArray = iterator_to_array($this->healthChecks);
+            foreach ($this->cachedResults as $index => $result) {
+                $healthCheck = $healthCheckArray[$index] ?? null;
+                if (null !== $healthCheck && $result->isUnhealthy() && $healthCheck->isCritical()) {
+                    return HealthCheckStatus::UNHEALTHY;
+                }
+            }
+
+            return HealthCheckStatus::HEALTHY;
+        }
+
+        // Execute checks if cache is not available
         foreach ($this->healthChecks as $healthCheck) {
             $result = $healthCheck->check();
 
@@ -100,6 +148,18 @@ class HealthCheckService
         }
 
         return HealthCheckStatus::HEALTHY;
+    }
+
+    /**
+     * Check if the cache is still fresh (within TTL).
+     */
+    private function isCacheFresh(): bool
+    {
+        if (null === $this->cachedResults || null === $this->cacheTimestamp) {
+            return false;
+        }
+
+        return (microtime(true) - $this->cacheTimestamp) < self::CACHE_TTL;
     }
 
     /**
