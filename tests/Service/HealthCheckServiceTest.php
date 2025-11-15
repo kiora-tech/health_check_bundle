@@ -344,6 +344,143 @@ class HealthCheckServiceTest extends TestCase
         $this->assertSame(2, $callCount, 'Call without group should use cache');
     }
 
+    public function testStatisticsArePresentInResponse(): void
+    {
+        $check1 = $this->createMockCheckWithDuration('check1', [], 0.05);
+        $check2 = $this->createMockCheckWithDuration('check2', [], 0.15);
+        $check3 = $this->createMockCheckWithDuration('check3', [], 0.10);
+
+        $service = new HealthCheckService([$check1, $check2, $check3]);
+        $results = $service->runAllChecks();
+
+        $this->assertArrayHasKey('statistics', $results);
+        $this->assertIsArray($results['statistics']);
+        $this->assertArrayHasKey('total_checks', $results['statistics']);
+        $this->assertArrayHasKey('slow_checks', $results['statistics']);
+        $this->assertArrayHasKey('average_duration', $results['statistics']);
+        $this->assertArrayHasKey('slowest_check', $results['statistics']);
+    }
+
+    public function testStatisticsTotalChecksCount(): void
+    {
+        $check1 = $this->createMockCheckWithDuration('check1', [], 0.05);
+        $check2 = $this->createMockCheckWithDuration('check2', [], 0.15);
+        $check3 = $this->createMockCheckWithDuration('check3', [], 0.10);
+
+        $service = new HealthCheckService([$check1, $check2, $check3]);
+        $results = $service->runAllChecks();
+
+        $this->assertSame(3, $results['statistics']['total_checks']);
+    }
+
+    public function testStatisticsSlowChecksCount(): void
+    {
+        $check1 = $this->createMockCheckWithDuration('fast_check', [], 0.5);
+        $check2 = $this->createMockCheckWithDuration('slow_check_1', [], 1.2);
+        $check3 = $this->createMockCheckWithDuration('slow_check_2', [], 2.5);
+        $check4 = $this->createMockCheckWithDuration('fast_check_2', [], 0.8);
+
+        $service = new HealthCheckService([$check1, $check2, $check3, $check4]);
+        $results = $service->runAllChecks();
+
+        $this->assertSame(2, $results['statistics']['slow_checks'], 'Should identify 2 checks slower than 1 second');
+    }
+
+    public function testStatisticsSlowChecksCountWhenNoneAreSlow(): void
+    {
+        $check1 = $this->createMockCheckWithDuration('check1', [], 0.05);
+        $check2 = $this->createMockCheckWithDuration('check2', [], 0.15);
+        $check3 = $this->createMockCheckWithDuration('check3', [], 0.50);
+
+        $service = new HealthCheckService([$check1, $check2, $check3]);
+        $results = $service->runAllChecks();
+
+        $this->assertSame(0, $results['statistics']['slow_checks']);
+    }
+
+    public function testStatisticsAverageDurationCalculation(): void
+    {
+        // Durations: 0.1, 0.2, 0.3 => Average: 0.2
+        $check1 = $this->createMockCheckWithDuration('check1', [], 0.1);
+        $check2 = $this->createMockCheckWithDuration('check2', [], 0.2);
+        $check3 = $this->createMockCheckWithDuration('check3', [], 0.3);
+
+        $service = new HealthCheckService([$check1, $check2, $check3]);
+        $results = $service->runAllChecks();
+
+        $this->assertSame(0.2, $results['statistics']['average_duration']);
+    }
+
+    public function testStatisticsSlowestCheckIdentification(): void
+    {
+        $check1 = $this->createMockCheckWithDuration('fast_check', [], 0.05);
+        $check2 = $this->createMockCheckWithDuration('slowest_check', [], 0.75);
+        $check3 = $this->createMockCheckWithDuration('medium_check', [], 0.25);
+
+        $service = new HealthCheckService([$check1, $check2, $check3]);
+        $results = $service->runAllChecks();
+
+        $this->assertIsArray($results['statistics']['slowest_check']);
+        $this->assertSame('slowest_check', $results['statistics']['slowest_check']['name']);
+        $this->assertSame(0.75, $results['statistics']['slowest_check']['duration']);
+    }
+
+    public function testStatisticsWhenNoChecksExecuted(): void
+    {
+        $service = new HealthCheckService([]);
+        $results = $service->runAllChecks();
+
+        $this->assertSame(0, $results['statistics']['total_checks']);
+        $this->assertSame(0, $results['statistics']['slow_checks']);
+        $this->assertSame(0.0, $results['statistics']['average_duration']);
+        $this->assertNull($results['statistics']['slowest_check']);
+    }
+
+    public function testStatisticsWithGroupFiltering(): void
+    {
+        $check1 = $this->createMockCheckWithDuration('web_check', ['web'], 0.1);
+        $check2 = $this->createMockCheckWithDuration('worker_check', ['worker'], 1.5);
+        $check3 = $this->createMockCheckWithDuration('all_groups_check', [], 0.3);
+
+        $service = new HealthCheckService([$check1, $check2, $check3]);
+        $results = $service->runAllChecks('web');
+
+        // Should only count web_check and all_groups_check
+        $this->assertSame(2, $results['statistics']['total_checks']);
+        $this->assertSame(0, $results['statistics']['slow_checks']);
+        $this->assertSame(0.2, $results['statistics']['average_duration']); // (0.1 + 0.3) / 2
+        $this->assertSame('all_groups_check', $results['statistics']['slowest_check']['name']);
+        $this->assertSame(0.3, $results['statistics']['slowest_check']['duration']);
+    }
+
+    public function testStatisticsDurationRounding(): void
+    {
+        // Test that durations are rounded to 3 decimal places
+        $check1 = $this->createMockCheckWithDuration('check1', [], 0.1234567);
+        $check2 = $this->createMockCheckWithDuration('check2', [], 0.9876543);
+
+        $service = new HealthCheckService([$check1, $check2]);
+        $results = $service->runAllChecks();
+
+        // Average: (0.1234567 + 0.9876543) / 2 = 0.5555555 => rounded to 0.556
+        $this->assertSame(0.556, $results['statistics']['average_duration']);
+        $this->assertSame(0.988, $results['statistics']['slowest_check']['duration']);
+    }
+
+    public function testStatisticsWithSingleCheck(): void
+    {
+        $check = $this->createMockCheckWithDuration('single_check', [], 0.42);
+
+        $service = new HealthCheckService([$check]);
+        $results = $service->runAllChecks();
+
+        $this->assertSame(1, $results['statistics']['total_checks']);
+        $this->assertSame(0, $results['statistics']['slow_checks']);
+        $this->assertSame(0.42, $results['statistics']['average_duration']);
+        $this->assertSame('single_check', $results['statistics']['slowest_check']['name']);
+        $this->assertSame(0.42, $results['statistics']['slowest_check']['duration']);
+    }
+
     private function createMockCheck(
         string $name,
         array $groups,
@@ -355,6 +492,31 @@ class HealthCheckServiceTest extends TestCase
             status: $status,
             message: 'Test message',
             duration: 0.0,
+            metadata: []
+        );
+
+        $check = $this->createMock(HealthCheckInterface::class);
+        $check->method('getName')->willReturn($name);
+        $check->method('getGroups')->willReturn($groups);
+        $check->method('isCritical')->willReturn($critical);
+        $check->method('check')->willReturn($result);
+        $check->method('getTimeout')->willReturn(5);
+
+        return $check;
+    }
+
+    private function createMockCheckWithDuration(
+        string $name,
+        array $groups,
+        float $duration,
+        HealthCheckStatus $status = HealthCheckStatus::HEALTHY,
+        bool $critical = true
+    ): HealthCheckInterface {
+        $result = new HealthCheckResult(
+            name: $name,
+            status: $status,
+            message: 'Test message',
+            duration: $duration,
             metadata: []
         );
 

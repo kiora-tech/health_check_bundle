@@ -42,7 +42,7 @@ class HealthCheckService
      * @param string|null $group    Optional group filter (e.g., 'web', 'worker', 'console')
      * @param bool        $useCache Whether to use cached results if available (default: true)
      *
-     * @return array{status: string, timestamp: string, duration: float, checks: array<int, array<string, mixed>>}
+     * @return array{status: string, timestamp: string, duration: float, checks: array<int, array<string, mixed>>, statistics: array<string, mixed>}
      */
     public function runAllChecks(?string $group = null, bool $useCache = true): array
     {
@@ -85,6 +85,9 @@ class HealthCheckService
 
         $totalDuration = microtime(true) - $startTime;
 
+        // Calculate statistics
+        $statistics = $this->calculateStatistics($results);
+
         return [
             'status' => $overallStatus->value,
             'timestamp' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
@@ -93,6 +96,45 @@ class HealthCheckService
                 static fn (HealthCheckResult $result): array => $result->toArray(),
                 $results
             ),
+            'statistics' => $statistics,
+        ];
+    }
+
+    /**
+     * Calculate performance statistics from health check results.
+     *
+     * @param array<int, HealthCheckResult> $results
+     *
+     * @return array{total_checks: int, slow_checks: int, average_duration: float, slowest_check: array{name: string, duration: float}|null}
+     */
+    private function calculateStatistics(array $results): array
+    {
+        $totalChecks = count($results);
+
+        // Identify slow checks (execution time > 1 second)
+        $slowChecks = array_filter(
+            $results,
+            static fn (HealthCheckResult $result): bool => $result->duration > 1.0
+        );
+
+        // Find the slowest check
+        $sortedByDuration = $results;
+        usort($sortedByDuration, static fn (HealthCheckResult $a, HealthCheckResult $b): int => $b->duration <=> $a->duration);
+        $slowest = $sortedByDuration[0] ?? null;
+
+        // Calculate average duration
+        $averageDuration = $totalChecks > 0
+            ? array_sum(array_map(static fn (HealthCheckResult $r): float => $r->duration, $results)) / $totalChecks
+            : 0.0;
+
+        return [
+            'total_checks' => $totalChecks,
+            'slow_checks' => count($slowChecks),
+            'average_duration' => round($averageDuration, 3),
+            'slowest_check' => null !== $slowest ? [
+                'name' => $slowest->name,
+                'duration' => round($slowest->duration, 3),
+            ] : null,
         ];
     }
 
