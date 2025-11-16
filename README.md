@@ -17,18 +17,21 @@ A Symfony bundle providing comprehensive health check functionality for monitori
 ## Why use this bundle?
 
 **Production-Ready & Battle-Tested**
+
 - Comprehensive test coverage with 37 tests and 104 assertions
 - PHPStan level 9 static analysis - strictest type safety (maximum level)
 - CI/CD pipeline testing across PHP 8.3/8.4 and Symfony 6.4/7.0/7.1
 - Security-first design with no sensitive information exposure
 
 **Enterprise-Grade Features**
+
 - Multiple database connections support (read/write replicas, analytics, logs)
 - Context-aware health checks with group filtering (web, worker, console)
 - Kubernetes-ready with dedicated liveness (`/ping`) and readiness (`/ready`) probes
 - Performance monitoring with execution statistics and slow check detection
 
 **Developer-Friendly**
+
 - Modern auto-configuration with Symfony's `#[AutoconfigureTag]`
 - No manual service tagging required
 - Docker development environment included
