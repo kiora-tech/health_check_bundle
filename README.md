@@ -3,16 +3,15 @@
 A Symfony bundle providing comprehensive health check functionality for monitoring application dependencies and services.
 
 [![CI](https://github.com/kiora-tech/health_check_bundle/actions/workflows/ci.yml/badge.svg)](https://github.com/kiora-tech/health_check_bundle/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/kiora-tech/health_check_bundle/graph/badge.svg)](https://codecov.io/gh/kiora-tech/health_check_bundle)
+[![codecov](https://codecov.io/gh/kiora-tech/health_check_bundle/branch/main/graph/badge.svg)](https://codecov.io/gh/kiora-tech/health_check_bundle)
 [![PHPStan Level 9](https://img.shields.io/badge/PHPStan-level%209-brightgreen.svg?style=flat)](https://phpstan.org/)
-[![Type Coverage](https://shepherd.dev/github/kiora-tech/health_check_bundle/coverage.svg)](https://shepherd.dev/github/kiora-tech/health_check_bundle)
 
 [![Latest Stable Version](https://poser.pugx.org/kiora/health-check-bundle/v/stable)](https://packagist.org/packages/kiora/health-check-bundle)
 [![Total Downloads](https://poser.pugx.org/kiora/health-check-bundle/downloads)](https://packagist.org/packages/kiora/health-check-bundle)
 [![License](https://poser.pugx.org/kiora/health-check-bundle/license)](https://packagist.org/packages/kiora/health-check-bundle)
 
-[![PHP Version](https://img.shields.io/badge/php-8.3%20|%208.4-777BB4.svg?logo=php&logoColor=white)](https://www.php.net/)
-[![Symfony Version](https://img.shields.io/badge/symfony-6.4%20|%207.0%20|%207.1-000000.svg?logo=symfony)](https://symfony.com/)
+[![PHP Version](https://img.shields.io/badge/php-8.3%20%7C%208.4-777BB4.svg?logo=php&logoColor=white)](https://www.php.net/)
+[![Symfony Version](https://img.shields.io/badge/symfony-6.4%20%7C%207.0%20%7C%207.1-000000.svg?logo=symfony)](https://symfony.com/)
 
 ## Why use this bundle?
 
