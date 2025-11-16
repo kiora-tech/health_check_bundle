@@ -332,6 +332,7 @@ curl http://localhost/ping
 ```
 
 **Response:**
+
 ```json
 {
   "status": "up",
@@ -342,6 +343,7 @@ curl http://localhost/ping
 **Use case:** Kubernetes liveness probes, load balancer health checks
 
 **Characteristics:**
+
 - Always returns HTTP 200 (unless the app is completely down)
 - No database or external service checks
 - Extremely fast response time
@@ -356,6 +358,7 @@ curl http://localhost/ready
 ```
 
 **Response:**
+
 ```json
 {
   "status": "healthy",
@@ -385,6 +388,7 @@ curl http://localhost/ready
 **Use case:** Kubernetes readiness probes, determining when pods should receive traffic
 
 **Characteristics:**
+
 - Returns HTTP 200 if all critical dependencies are healthy
 - Returns HTTP 503 if any critical dependency is unhealthy
 - Only checks services in the "readiness" group
@@ -405,6 +409,7 @@ curl http://localhost/health?group=web
 **Use case:** Monitoring dashboards, alerting systems, comprehensive health status
 
 **Characteristics:**
+
 - Returns HTTP 200 if all critical checks pass
 - Returns HTTP 503 if any critical check fails
 - Supports filtering by group via `?group=` parameter
@@ -795,6 +800,7 @@ spec:
 #### Probe Configuration Explained
 
 **Liveness Probe (`/ping`):**
+
 - `initialDelaySeconds: 10` - Wait 10 seconds after container starts before first check
 - `periodSeconds: 10` - Check every 10 seconds
 - `timeoutSeconds: 3` - Consider failed if no response within 3 seconds
@@ -802,6 +808,7 @@ spec:
 - Uses `/ping` endpoint which has no external dependencies and is extremely fast
 
 **Readiness Probe (`/ready`):**
+
 - `initialDelaySeconds: 5` - Wait 5 seconds after container starts before first check
 - `periodSeconds: 5` - Check every 5 seconds
 - `timeoutSeconds: 5` - Consider failed if no response within 5 seconds
@@ -811,6 +818,7 @@ spec:
 #### Why Separate Endpoints?
 
 **Problem with using `/health` for both:**
+
 ```yaml
 # ❌ Not recommended - single endpoint for both probes
 livenessProbe:
@@ -824,11 +832,13 @@ readinessProbe:
 ```
 
 **Issues:**
+
 1. If database is temporarily unavailable, pod gets restarted (liveness)
 2. Unnecessary restarts can cause cascading failures
 3. No distinction between "app is running" and "app can serve traffic"
 
 **Solution with separate endpoints:**
+
 ```yaml
 # ✅ Recommended - separate endpoints
 livenessProbe:
@@ -842,6 +852,7 @@ readinessProbe:
 ```
 
 **Benefits:**
+
 1. Database issues remove pod from service (readiness) but don't restart it (liveness)
 2. Pod has time to recover from transient failures
 3. Clear separation of concerns
