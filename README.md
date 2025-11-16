@@ -319,10 +319,147 @@ services:
 
 ## Usage
 
-### Accessing the Health Check Endpoint
+### Available Endpoints
+
+The bundle provides three distinct endpoints for different monitoring purposes:
+
+#### 1. `/ping` - Liveness Probe (Lightweight)
+
+A simple endpoint that verifies the application is running without checking any external dependencies.
 
 ```bash
+curl http://localhost/ping
+```
+
+**Response:**
+
+```json
+{
+  "status": "up",
+  "timestamp": "2024-01-01T12:00:00+00:00"
+}
+```
+
+**Use case:** Kubernetes liveness probes, load balancer health checks
+
+**Characteristics:**
+
+- Always returns HTTP 200 (unless the app is completely down)
+- No database or external service checks
+- Extremely fast response time
+- Minimal resource usage
+
+#### 2. `/ready` - Readiness Probe (Critical Dependencies)
+
+Checks if the application is ready to serve traffic by verifying critical dependencies in the "readiness" group.
+
+```bash
+curl http://localhost/ready
+```
+
+**Response:**
+
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-01-01T12:00:00+00:00",
+  "duration": 0.015,
+  "checks": [
+    {
+      "name": "database",
+      "status": "healthy",
+      "message": "Database operational",
+      "duration": 0.012,
+      "metadata": []
+    }
+  ],
+  "statistics": {
+    "total_checks": 1,
+    "slow_checks": 0,
+    "average_duration": 0.012,
+    "slowest_check": {
+      "name": "database",
+      "duration": 0.012
+    }
+  }
+}
+```
+
+**Use case:** Kubernetes readiness probes, determining when pods should receive traffic
+
+**Characteristics:**
+
+- Returns HTTP 200 if all critical dependencies are healthy
+- Returns HTTP 503 if any critical dependency is unhealthy
+- Only checks services in the "readiness" group
+- Prevents traffic routing to pods with unhealthy dependencies
+
+#### 3. `/health` - Comprehensive Health Check
+
+Provides complete health status of all configured health checks, optionally filtered by group.
+
+```bash
+# Check all health checks
 curl http://localhost/health
+
+# Check specific group
+curl http://localhost/health?group=web
+```
+
+**Use case:** Monitoring dashboards, alerting systems, comprehensive health status
+
+**Characteristics:**
+
+- Returns HTTP 200 if all critical checks pass
+- Returns HTTP 503 if any critical check fails
+- Supports filtering by group via `?group=` parameter
+- Includes performance statistics
+
+### Endpoint Comparison
+
+| Feature | `/ping` | `/ready` | `/health` |
+|---------|---------|----------|-----------|
+| Purpose | Is app running? | Can serve traffic? | Overall health |
+| Dependencies Checked | None | Readiness group only | All or filtered by group |
+| Response Time | Instant | Fast | Depends on checks |
+| Kubernetes Use | Liveness probe | Readiness probe | Monitoring |
+| HTTP 503 on Failure | Never | Yes | Yes |
+| Group Filtering | No | Fixed (readiness) | Yes (`?group=`) |
+
+### Configuring Health Checks for Readiness
+
+To mark health checks as critical for readiness probes, assign them to the "readiness" group:
+
+```yaml
+services:
+    # Database - critical for readiness
+    app.health_check.database:
+        class: Kiora\HealthCheckBundle\HealthCheck\Checks\DatabaseHealthCheck
+        autoconfigure: true
+        arguments:
+            $connection: '@doctrine.dbal.default_connection'
+            $groups: ['readiness']  # Mark as critical for readiness
+            $critical: true
+
+    # Redis - critical for readiness
+    app.health_check.redis:
+        class: Kiora\HealthCheckBundle\HealthCheck\Checks\RedisHealthCheck
+        autoconfigure: true
+        arguments:
+            $host: '%env(REDIS_HOST)%'
+            $port: '%env(int:REDIS_PORT)%'
+            $groups: ['readiness']  # Mark as critical for readiness
+            $critical: true
+
+    # External API - non-critical, not for readiness
+    app.health_check.external_api:
+        class: Kiora\HealthCheckBundle\HealthCheck\Checks\HttpHealthCheck
+        autoconfigure: true
+        arguments:
+            $url: 'https://api.example.com/health'
+            $name: 'external_api'
+            $groups: ['web']  # Only in web group, not readiness
+            $critical: false
 ```
 
 ### Response Format
@@ -606,22 +743,143 @@ services:
 
 ## Monitoring Integration
 
-### Kubernetes Liveness/Readiness Probes
+### Kubernetes Liveness and Readiness Probes
+
+Kubernetes distinguishes between two types of health checks:
+
+- **Liveness Probe**: Determines if the pod is alive and should be restarted if not
+- **Readiness Probe**: Determines if the pod is ready to receive traffic
+
+#### Recommended Configuration
 
 ```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp
+spec:
+  template:
+    spec:
+      containers:
+      - name: myapp
+        image: myapp:latest
+        ports:
+        - containerPort: 80
+
+        # Liveness probe - Is the pod alive?
+        # Uses /ping endpoint (no external dependencies)
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: 80
+            httpHeaders:
+            - name: Host
+              value: localhost
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+
+        # Readiness probe - Can the pod serve traffic?
+        # Uses /ready endpoint (checks critical dependencies)
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 80
+            httpHeaders:
+            - name: Host
+              value: localhost
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+```
+
+#### Probe Configuration Explained
+
+**Liveness Probe (`/ping`):**
+
+- `initialDelaySeconds: 10` - Wait 10 seconds after container starts before first check
+- `periodSeconds: 10` - Check every 10 seconds
+- `timeoutSeconds: 3` - Consider failed if no response within 3 seconds
+- `failureThreshold: 3` - Restart pod after 3 consecutive failures
+- Uses `/ping` endpoint which has no external dependencies and is extremely fast
+
+**Readiness Probe (`/ready`):**
+
+- `initialDelaySeconds: 5` - Wait 5 seconds after container starts before first check
+- `periodSeconds: 5` - Check every 5 seconds
+- `timeoutSeconds: 5` - Consider failed if no response within 5 seconds
+- `failureThreshold: 3` - Remove from service after 3 consecutive failures
+- Uses `/ready` endpoint which checks critical dependencies (database, cache, etc.)
+
+#### Why Separate Endpoints?
+
+**Problem with using `/health` for both:**
+
+```yaml
+# ❌ Not recommended - single endpoint for both probes
 livenessProbe:
   httpGet:
-    path: /health
+    path: /health  # Checks all dependencies
     port: 80
-  initialDelaySeconds: 30
-  periodSeconds: 10
-
 readinessProbe:
   httpGet:
-    path: /health
+    path: /health  # Same checks
     port: 80
-  initialDelaySeconds: 5
-  periodSeconds: 5
+```
+
+**Issues:**
+
+1. If database is temporarily unavailable, pod gets restarted (liveness)
+2. Unnecessary restarts can cause cascading failures
+3. No distinction between "app is running" and "app can serve traffic"
+
+**Solution with separate endpoints:**
+
+```yaml
+# ✅ Recommended - separate endpoints
+livenessProbe:
+  httpGet:
+    path: /ping    # Only checks if app is alive
+    port: 80
+readinessProbe:
+  httpGet:
+    path: /ready   # Checks critical dependencies
+    port: 80
+```
+
+**Benefits:**
+
+1. Database issues remove pod from service (readiness) but don't restart it (liveness)
+2. Pod has time to recover from transient failures
+3. Clear separation of concerns
+4. Follows Kubernetes best practices
+
+#### Context-Specific Health Checks
+
+For different deployment types, use the `?group=` parameter:
+
+```yaml
+# Web deployment
+readinessProbe:
+  httpGet:
+    path: /health?group=web
+    port: 80
+
+# Worker deployment
+readinessProbe:
+  httpGet:
+    path: /health?group=worker
+    port: 80
+
+# Or use dedicated /ready endpoint for critical dependencies
+readinessProbe:
+  httpGet:
+    path: /ready  # Only checks "readiness" group
+    port: 80
 ```
 
 ### Docker Healthcheck
@@ -773,6 +1031,12 @@ Created and maintained by [Kiora Tech](https://kiora.tech).
 
 ### Unreleased
 
+- **Readiness Probe Endpoint**: Added dedicated `/ready` endpoint for Kubernetes readiness probes
+  - Checks only health checks in the "readiness" group
+  - Returns HTTP 200 when ready, 503 when not ready
+  - Proper separation between liveness (`/ping`) and readiness (`/ready`) probes
+  - Follows Kubernetes best practices for probe configuration
+  - Prevents traffic routing to pods with unhealthy critical dependencies
 - **Multiple Database Connections**: Support for monitoring multiple Doctrine DBAL connections
   - Named connections with custom identifiers (e.g., `database_analytics`, `database_logs`)
   - Per-connection criticality configuration
@@ -781,7 +1045,7 @@ Created and maintained by [Kiora Tech](https://kiora.tech).
   - Query parameter support: `?group=web`, `?group=worker`, `?group=console`
   - Per-check group assignment
   - Empty groups = belongs to all contexts (default behavior)
-- Comprehensive test suite with 31 tests and 86 assertions
+- Comprehensive test suite with 37 tests and 104 assertions
 
 ### 1.0.0 (2025-11-06)
 

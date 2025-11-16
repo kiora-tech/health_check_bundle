@@ -44,4 +44,30 @@ class HealthCheckController extends AbstractController
             'Cache-Control' => 'no-store, no-cache, must-revalidate, private',
         ]);
     }
+
+    /**
+     * Kubernetes readiness probe endpoint.
+     *
+     * Returns HTTP 200 if the application is ready to serve traffic (all critical dependencies are healthy).
+     * Returns HTTP 503 if the application is not ready (one or more critical dependencies are unhealthy).
+     *
+     * This endpoint checks only health checks in the "readiness" group, allowing you to distinguish
+     * between liveness (is the app running?) and readiness (can the app serve traffic?).
+     *
+     * @return JsonResponse JSON response with readiness check results
+     */
+    #[Route('/ready', name: 'health_readiness', methods: ['GET'])]
+    public function readiness(Request $request): JsonResponse
+    {
+        // Only check "readiness" group
+        $results = $this->healthCheckService->runAllChecks('readiness');
+
+        $statusCode = 'healthy' === $results['status'] ? 200 : 503;
+
+        return new JsonResponse($results, $statusCode, [
+            'X-Robots-Tag' => 'noindex, nofollow',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, private',
+        ]);
+    }
 }
