@@ -11,7 +11,7 @@ A Symfony bundle providing comprehensive health check functionality for monitori
 [![License](https://poser.pugx.org/kiora/health-check-bundle/license)](https://packagist.org/packages/kiora/health-check-bundle)
 
 [![PHP Version](https://img.shields.io/badge/php-8.3%20%7C%208.4-777BB4.svg?logo=php&logoColor=white)](https://www.php.net/)
-[![Symfony Version](https://img.shields.io/badge/symfony-6.4%20%7C%207.0%20%7C%207.1-000000.svg?logo=symfony)](https://symfony.com/)
+[![Symfony Version](https://img.shields.io/badge/symfony-6.4%20%7C%207.0%20%7C%207.1-green.svg?logo=symfony&logoColor=white)](https://symfony.com/)
 
 ## Why use this bundle?
 
