@@ -3,9 +3,36 @@
 A Symfony bundle providing comprehensive health check functionality for monitoring application dependencies and services.
 
 [![CI](https://github.com/kiora-tech/health_check_bundle/actions/workflows/ci.yml/badge.svg)](https://github.com/kiora-tech/health_check_bundle/actions/workflows/ci.yml)
-[![PHP Version](https://img.shields.io/badge/php-%3E%3D8.3-blue)](https://www.php.net/)
-[![Symfony Version](https://img.shields.io/badge/symfony-%5E6.4%7C%5E7.0-green)](https://symfony.com/)
-[![License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
+[![codecov](https://codecov.io/gh/kiora-tech/health_check_bundle/graph/badge.svg)](https://codecov.io/gh/kiora-tech/health_check_bundle)
+[![PHPStan Level 9](https://img.shields.io/badge/PHPStan-level%209-brightgreen.svg?style=flat)](https://phpstan.org/)
+[![Type Coverage](https://shepherd.dev/github/kiora-tech/health_check_bundle/coverage.svg)](https://shepherd.dev/github/kiora-tech/health_check_bundle)
+
+[![Latest Stable Version](https://poser.pugx.org/kiora/health-check-bundle/v/stable)](https://packagist.org/packages/kiora/health-check-bundle)
+[![Total Downloads](https://poser.pugx.org/kiora/health-check-bundle/downloads)](https://packagist.org/packages/kiora/health-check-bundle)
+[![License](https://poser.pugx.org/kiora/health-check-bundle/license)](https://packagist.org/packages/kiora/health-check-bundle)
+
+[![PHP Version](https://img.shields.io/badge/php-8.3%20|%208.4-777BB4.svg?logo=php&logoColor=white)](https://www.php.net/)
+[![Symfony Version](https://img.shields.io/badge/symfony-6.4%20|%207.0%20|%207.1-000000.svg?logo=symfony)](https://symfony.com/)
+
+## Why use this bundle?
+
+**Production-Ready & Battle-Tested**
+- Comprehensive test coverage with 37 tests and 104 assertions
+- PHPStan level 9 static analysis - strictest type safety (maximum level)
+- CI/CD pipeline testing across PHP 8.3/8.4 and Symfony 6.4/7.0/7.1
+- Security-first design with no sensitive information exposure
+
+**Enterprise-Grade Features**
+- Multiple database connections support (read/write replicas, analytics, logs)
+- Context-aware health checks with group filtering (web, worker, console)
+- Kubernetes-ready with dedicated liveness (`/ping`) and readiness (`/ready`) probes
+- Performance monitoring with execution statistics and slow check detection
+
+**Developer-Friendly**
+- Modern auto-configuration with Symfony's `#[AutoconfigureTag]`
+- No manual service tagging required
+- Docker development environment included
+- Follows Symfony best practices and coding standards
 
 ## Features
 
