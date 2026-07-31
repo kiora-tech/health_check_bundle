@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kiora\HealthCheckBundle\Controller;
 
+use Kiora\HealthCheckBundle\HealthCheck\HealthCheckStatus;
 use Kiora\HealthCheckBundle\Service\HealthCheckService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -17,6 +18,25 @@ use Symfony\Component\Routing\Attribute\Route;
  */
 class HealthCheckController extends AbstractController
 {
+    /**
+     * Group probed by the readiness endpoint.
+     */
+    private const READINESS_GROUP = 'readiness';
+
+    /**
+     * Headers applied to every health response.
+     *
+     * Health output must never be cached by proxies or indexed by crawlers:
+     * a cached probe would report a state the application has already left.
+     *
+     * @var array<string, string>
+     */
+    private const RESPONSE_HEADERS = [
+        'X-Robots-Tag' => 'noindex, nofollow',
+        'X-Content-Type-Options' => 'nosniff',
+        'Cache-Control' => 'no-store, no-cache, must-revalidate, private',
+    ];
+
     public function __construct(
         private readonly HealthCheckService $healthCheckService
     ) {
@@ -25,7 +45,7 @@ class HealthCheckController extends AbstractController
     /**
      * Get the overall health status of the application.
      *
-     * Returns HTTP 200 if healthy, 503 if unhealthy.
+     * Returns HTTP 200 if healthy or degraded, 503 if unhealthy.
      * Supports optional ?group= query parameter to filter checks by group.
      *
      * @return JsonResponse JSON response with health check results
@@ -33,16 +53,9 @@ class HealthCheckController extends AbstractController
     #[Route('/health', name: 'health_check', methods: ['GET'])]
     public function check(Request $request): JsonResponse
     {
-        $group = $request->query->get('group');
-        $results = $this->healthCheckService->runAllChecks($group);
+        $results = $this->healthCheckService->runAllChecks($this->resolveGroup($request));
 
-        $statusCode = 'healthy' === $results['status'] ? 200 : 503;
-
-        return new JsonResponse($results, $statusCode, [
-            'X-Robots-Tag' => 'noindex, nofollow',
-            'X-Content-Type-Options' => 'nosniff',
-            'Cache-Control' => 'no-store, no-cache, must-revalidate, private',
-        ]);
+        return $this->respond($results);
     }
 
     /**
@@ -57,17 +70,41 @@ class HealthCheckController extends AbstractController
      * @return JsonResponse JSON response with readiness check results
      */
     #[Route('/ready', name: 'health_readiness', methods: ['GET'])]
-    public function readiness(Request $request): JsonResponse
+    public function readiness(?Request $request = null): JsonResponse
     {
-        // Only check "readiness" group
-        $results = $this->healthCheckService->runAllChecks('readiness');
+        $results = $this->healthCheckService->runAllChecks(self::READINESS_GROUP);
 
-        $statusCode = 'healthy' === $results['status'] ? 200 : 503;
+        return $this->respond($results);
+    }
 
-        return new JsonResponse($results, $statusCode, [
-            'X-Robots-Tag' => 'noindex, nofollow',
-            'X-Content-Type-Options' => 'nosniff',
-            'Cache-Control' => 'no-store, no-cache, must-revalidate, private',
-        ]);
+    /**
+     * Build the JSON response, deriving the HTTP code from the reported status.
+     *
+     * HealthCheckStatus is the single source of truth for the mapping, so a
+     * degraded application answers 200 instead of being pulled out of the load
+     * balancer rotation for a non-critical failure.
+     *
+     * @param array{status: string, timestamp: string, duration: float, checks: array<int, array<string, mixed>>, statistics: array<string, mixed>} $results
+     */
+    private function respond(array $results): JsonResponse
+    {
+        $statusCode = HealthCheckStatus::tryFrom($results['status'])?->getHttpStatusCode()
+            ?? HealthCheckStatus::UNHEALTHY->getHttpStatusCode();
+
+        return new JsonResponse($results, $statusCode, self::RESPONSE_HEADERS);
+    }
+
+    /**
+     * Read the optional group filter from the query string.
+     *
+     * Reads through all() so that a repeated or array-shaped parameter
+     * (?group[]=web) yields null instead of raising a bad-request exception:
+     * a malformed probe URL should not make the endpoint itself fail.
+     */
+    private function resolveGroup(Request $request): ?string
+    {
+        $group = $request->query->all()['group'] ?? null;
+
+        return is_string($group) && '' !== $group ? $group : null;
     }
 }
