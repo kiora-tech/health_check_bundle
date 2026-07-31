@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-07-31
+
 ### Fixed
 
 - **Criticality was attributed to the wrong check when filtering by group.**
@@ -71,4 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   computed for a different scope.
 - PHPStan level 9 now also analyses `tests/`.
 
-[Unreleased]: https://github.com/kiora/health-check-bundle/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/kiora-tech/health_check_bundle/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/kiora-tech/health_check_bundle/compare/v2.0.0...v2.1.0
+[2.0.0]: https://github.com/kiora-tech/health_check_bundle/compare/v1.1.0...v2.0.0
+[1.1.0]: https://github.com/kiora-tech/health_check_bundle/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/kiora-tech/health_check_bundle/releases/tag/v1.0.0
