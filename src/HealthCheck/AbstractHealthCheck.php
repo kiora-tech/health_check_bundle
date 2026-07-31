@@ -4,15 +4,32 @@ declare(strict_types=1);
 
 namespace Kiora\HealthCheckBundle\HealthCheck;
 
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerInterface;
+
 /**
  * Abstract base class for health checks.
  *
  * Provides automatic timeout management, execution time measurement,
  * and exception handling. Concrete implementations only need to
  * implement the doCheck() method.
+ *
+ * Implements LoggerAwareInterface: when MonologBundle is installed, Symfony
+ * injects the logger automatically. Failures are then recorded server-side
+ * with their full exception detail while HTTP responses stay generic.
  */
-abstract class AbstractHealthCheck implements HealthCheckInterface
+abstract class AbstractHealthCheck implements HealthCheckInterface, LoggerAwareInterface
 {
+    protected ?LoggerInterface $logger = null;
+
+    /**
+     * Inject a PSR-3 logger used to record check failures internally.
+     */
+    public function setLogger(LoggerInterface $logger): void
+    {
+        $this->logger = $logger;
+    }
+
     /**
      * Execute the health check with timeout and error handling.
      */
@@ -21,26 +38,22 @@ abstract class AbstractHealthCheck implements HealthCheckInterface
         $startTime = microtime(true);
         $timeout = $this->getTimeout();
 
-        // Set maximum execution time for this check
-        $previousTimeout = ini_get('max_execution_time');
-        set_time_limit($timeout);
+        $previousTimeout = $this->applyTimeLimit($timeout);
 
         try {
             $result = $this->doCheck();
-
-            // Calculate actual duration
             $duration = microtime(true) - $startTime;
 
-            // Return result with measured duration
-            return new HealthCheckResult(
-                name: $result->name,
-                status: $result->status,
-                message: $result->message,
-                duration: $duration,
-                metadata: $result->metadata
-            );
+            return $this->finalizeResult($result, $duration, $timeout);
         } catch (\Throwable $e) {
             $duration = microtime(true) - $startTime;
+
+            // Log the real cause internally; the response stays generic on purpose.
+            $this->logger?->error('Health check "{check}" threw an exception', [
+                'check' => $this->getName(),
+                'duration' => round($duration, 3),
+                'exception' => $e,
+            ]);
 
             return new HealthCheckResult(
                 name: $this->getName(),
@@ -50,9 +63,67 @@ abstract class AbstractHealthCheck implements HealthCheckInterface
                 metadata: []
             );
         } finally {
-            // Restore previous timeout (cast to int, 0 if false/empty)
-            set_time_limit(false !== $previousTimeout ? (int) $previousTimeout : 0);
+            if (null !== $previousTimeout) {
+                $this->applyTimeLimit($previousTimeout);
+            }
         }
+    }
+
+    /**
+     * Attach the measured duration to a result and flag timeout overruns.
+     *
+     * set_time_limit() does not interrupt time spent in blocking I/O — a
+     * stalled socket read can outlive the limit entirely — so the declared
+     * timeout cannot be enforced preemptively. Measuring afterwards is what
+     * makes an overrun visible: a check that succeeded but took longer than
+     * it promised is reported as degraded rather than silently healthy.
+     */
+    private function finalizeResult(HealthCheckResult $result, float $duration, int $timeout): HealthCheckResult
+    {
+        $status = $result->status;
+        $message = $result->message;
+
+        if ($timeout > 0 && $duration > $timeout && !$status->isUnhealthy()) {
+            $this->logger?->warning('Health check "{check}" exceeded its timeout', [
+                'check' => $this->getName(),
+                'duration' => round($duration, 3),
+                'timeout' => $timeout,
+            ]);
+
+            $status = HealthCheckStatus::DEGRADED;
+            $message = $result->message.' (exceeded timeout)';
+        }
+
+        return new HealthCheckResult(
+            name: $result->name,
+            status: $status,
+            message: $message,
+            duration: $duration,
+            metadata: $result->metadata
+        );
+    }
+
+    /**
+     * Set the PHP time limit, returning the previous value for restoration.
+     *
+     * Returns null when the limit could not be changed — set_time_limit() is
+     * commonly disabled via disable_functions, and it is a no-op in CLI where
+     * max_execution_time is already unlimited. In that case the caller skips
+     * restoration instead of emitting a second failing call.
+     */
+    private function applyTimeLimit(int $seconds): ?int
+    {
+        if ($seconds < 0 || !function_exists('set_time_limit')) {
+            return null;
+        }
+
+        $previous = ini_get('max_execution_time');
+
+        if (!@set_time_limit($seconds)) {
+            return null;
+        }
+
+        return false !== $previous ? (int) $previous : 0;
     }
 
     /**

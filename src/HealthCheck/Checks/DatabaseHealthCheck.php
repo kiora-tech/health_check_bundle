@@ -58,15 +58,33 @@ class DatabaseHealthCheck extends AbstractHealthCheck
     {
         try {
             // Execute a simple query to verify connection
-            $result = $this->connection->fetchOne('SELECT 1');
+            $result = $this->connection->fetchOne($this->getSentinelQuery());
 
             if (1 !== $result && '1' !== $result) {
                 return $this->createUnhealthyResult('Database query failed');
             }
 
             return $this->createHealthyResult('Database operational');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return $this->createUnhealthyResult('Database connection failed');
+        }
+    }
+
+    /**
+     * Build a platform-portable sentinel query.
+     *
+     * A bare "SELECT 1" is a syntax error on platforms that require a FROM
+     * clause — Oracle needs "FROM DUAL", DB2 needs "FROM SYSIBM.SYSDUMMY1" —
+     * so the check would report those databases as down while they are fine.
+     * DBAL knows the correct form per platform; fall back to the literal when
+     * the platform cannot be resolved (which needs a live connection itself).
+     */
+    private function getSentinelQuery(): string
+    {
+        try {
+            return $this->connection->getDatabasePlatform()->getDummySelectSQL();
+        } catch (\Throwable $e) {
+            return 'SELECT 1';
         }
     }
 }

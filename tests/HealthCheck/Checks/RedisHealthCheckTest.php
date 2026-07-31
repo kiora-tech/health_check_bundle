@@ -58,7 +58,8 @@ class RedisHealthCheckTest extends TestCase
             $this->markTestSkipped('Redis extension not available');
         }
 
-        $check = new RedisHealthCheck();
+        $host = getenv('REDIS_HOST') ?: 'localhost';
+        $check = new RedisHealthCheck(host: $host);
         $result = $check->check();
 
         $this->assertSame(HealthCheckStatus::HEALTHY, $result->status);
@@ -99,7 +100,8 @@ class RedisHealthCheckTest extends TestCase
             $this->markTestSkipped('Redis extension not available');
         }
 
-        $check = new RedisHealthCheck();
+        $host = getenv('REDIS_HOST') ?: 'localhost';
+        $check = new RedisHealthCheck(host: $host);
 
         // First check should create connection
         $result1 = $check->check();
@@ -135,7 +137,8 @@ class RedisHealthCheckTest extends TestCase
         $this->assertSame(HealthCheckStatus::UNHEALTHY, $result1->status);
 
         // Create a new check with valid settings to test recovery
-        $checkRecovered = new RedisHealthCheck();
+        $host = getenv('REDIS_HOST') ?: 'localhost';
+        $checkRecovered = new RedisHealthCheck(host: $host);
         $result2 = $checkRecovered->check();
 
         // Should successfully connect with valid settings
@@ -149,8 +152,9 @@ class RedisHealthCheckTest extends TestCase
             $this->markTestSkipped('Redis extension not available');
         }
 
-        $check1 = new RedisHealthCheck(critical: true);
-        $check2 = new RedisHealthCheck(critical: false);
+        $host = getenv('REDIS_HOST') ?: 'localhost';
+        $check1 = new RedisHealthCheck(host: $host, critical: true);
+        $check2 = new RedisHealthCheck(host: $host, critical: false);
 
         $result1 = $check1->check();
         $result2 = $check2->check();
@@ -170,7 +174,8 @@ class RedisHealthCheckTest extends TestCase
             $this->markTestSkipped('Redis extension not available');
         }
 
-        $check = new RedisHealthCheck();
+        $host = getenv('REDIS_HOST') ?: 'localhost';
+        $check = new RedisHealthCheck(host: $host);
 
         // Perform multiple checks to verify persistent connection works
         for ($i = 0; $i < 5; ++$i) {
@@ -186,7 +191,8 @@ class RedisHealthCheckTest extends TestCase
             $this->markTestSkipped('Redis extension not available');
         }
 
-        $check = new RedisHealthCheck(host: 'localhost', port: 6379);
+        $host = getenv('REDIS_HOST') ?: 'localhost';
+        $check = new RedisHealthCheck(host: $host, port: 6379);
 
         $this->assertSame('redis', $check->getName());
 
