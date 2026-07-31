@@ -3,6 +3,9 @@ includes:
 
 parameters:
     level: 9
+    # Tests are analysed too: GrumPHP feeds changed files to PHPStan, so
+    # excluding them here made the pre-commit hook fail on code the CI passed.
     paths:
         - src
+        - tests
     treatPhpDocTypesAsCertain: false
