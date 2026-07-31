@@ -114,7 +114,7 @@ class HealthCheckServiceTest extends TestCase
         $this->assertSame('unhealthy', $results['status']);
     }
 
-    public function testOverallStatusIsHealthyWhenNonCriticalCheckFails(): void
+    public function testOverallStatusIsDegradedWhenNonCriticalCheckFails(): void
     {
         $check1 = $this->createMockCheck('check1', [], HealthCheckStatus::HEALTHY, true);
         $check2 = $this->createMockCheck('check2', [], HealthCheckStatus::UNHEALTHY, false); // Non-critical
@@ -122,7 +122,32 @@ class HealthCheckServiceTest extends TestCase
         $service = new HealthCheckService([$check1, $check2]);
         $results = $service->runAllChecks();
 
-        $this->assertSame('healthy', $results['status']); // Still healthy because failed check is non-critical
+        // Degraded, not unhealthy: the failure is reported to monitoring but
+        // still maps to HTTP 200, so the instance keeps serving traffic.
+        $this->assertSame('degraded', $results['status']);
+        $this->assertSame(200, HealthCheckStatus::from($results['status'])->getHttpStatusCode());
+    }
+
+    public function testOverallStatusIsDegradedWhenACheckReportsDegraded(): void
+    {
+        $check1 = $this->createMockCheck('check1', [], HealthCheckStatus::HEALTHY, true);
+        $check2 = $this->createMockCheck('check2', [], HealthCheckStatus::DEGRADED, true);
+
+        $service = new HealthCheckService([$check1, $check2]);
+        $results = $service->runAllChecks();
+
+        $this->assertSame('degraded', $results['status']);
+    }
+
+    public function testCriticalFailureOutweighsDegradedChecks(): void
+    {
+        $check1 = $this->createMockCheck('check1', [], HealthCheckStatus::DEGRADED, false);
+        $check2 = $this->createMockCheck('check2', [], HealthCheckStatus::UNHEALTHY, true);
+
+        $service = new HealthCheckService([$check1, $check2]);
+        $results = $service->runAllChecks();
+
+        $this->assertSame('unhealthy', $results['status']);
     }
 
     public function testCacheHitPreventsDoubleExecution(): void
@@ -449,6 +474,7 @@ class HealthCheckServiceTest extends TestCase
         $this->assertSame(2, $results['statistics']['total_checks']);
         $this->assertSame(0, $results['statistics']['slow_checks']);
         $this->assertSame(0.2, $results['statistics']['average_duration']); // (0.1 + 0.3) / 2
+        $this->assertNotNull($results['statistics']['slowest_check']);
         $this->assertSame('all_groups_check', $results['statistics']['slowest_check']['name']);
         $this->assertSame(0.3, $results['statistics']['slowest_check']['duration']);
     }
@@ -464,6 +490,7 @@ class HealthCheckServiceTest extends TestCase
 
         // Average: (0.1234567 + 0.9876543) / 2 = 0.5555555 => rounded to 0.556
         $this->assertSame(0.556, $results['statistics']['average_duration']);
+        $this->assertNotNull($results['statistics']['slowest_check']);
         $this->assertSame(0.988, $results['statistics']['slowest_check']['duration']);
     }
 
@@ -477,10 +504,105 @@ class HealthCheckServiceTest extends TestCase
         $this->assertSame(1, $results['statistics']['total_checks']);
         $this->assertSame(0, $results['statistics']['slow_checks']);
         $this->assertSame(0.42, $results['statistics']['average_duration']);
+        $this->assertNotNull($results['statistics']['slowest_check']);
         $this->assertSame('single_check', $results['statistics']['slowest_check']['name']);
         $this->assertSame(0.42, $results['statistics']['slowest_check']['duration']);
     }
 
+    /**
+     * A group filter must not shift criticality onto the wrong check.
+     *
+     * Correlating results back to checks by array position silently breaks
+     * here: filtering drops the first check, so the failing non-critical one
+     * lands at index 0 and inherits the criticality of the check that was
+     * skipped — reporting a full outage where there is none.
+     */
+    public function testGroupFilterDoesNotMisattributeCriticality(): void
+    {
+        $skipped = $this->createMockCheck('skipped', ['worker'], HealthCheckStatus::HEALTHY, true);
+        $failing = $this->createMockCheck('failing', ['web'], HealthCheckStatus::UNHEALTHY, false);
+
+        $service = new HealthCheckService([$skipped, $failing]);
+        $results = $service->runAllChecks('web');
+
+        $this->assertCount(1, $results['checks']);
+        $this->assertSame('degraded', $results['status']);
+    }
+
+    /**
+     * The mirror case: a filtered-in critical failure must still be reported.
+     */
+    public function testGroupFilterKeepsCriticalFailureVisible(): void
+    {
+        $skipped = $this->createMockCheck('skipped', ['worker'], HealthCheckStatus::HEALTHY, false);
+        $failing = $this->createMockCheck('failing', ['web'], HealthCheckStatus::UNHEALTHY, true);
+
+        $service = new HealthCheckService([$skipped, $failing]);
+        $results = $service->runAllChecks('web');
+
+        $this->assertCount(1, $results['checks']);
+        $this->assertSame('unhealthy', $results['status']);
+    }
+
+    /**
+     * A cached unfiltered run must not be served to a filtered one.
+     */
+    public function testCacheIsScopedPerGroup(): void
+    {
+        $webOnly = $this->createMockCheck('web_only', ['web'], HealthCheckStatus::HEALTHY, true);
+        $workerOnly = $this->createMockCheck('worker_only', ['worker'], HealthCheckStatus::HEALTHY, true);
+
+        $service = new HealthCheckService([$webOnly, $workerOnly]);
+
+        $this->assertCount(2, $service->runAllChecks()['checks']);
+        $this->assertCount(1, $service->runAllChecks('web')['checks']);
+        $this->assertCount(1, $service->runAllChecks('worker')['checks']);
+    }
+
+    public function testGetHealthStatusReflectsCriticalityAndGroup(): void
+    {
+        $failing = $this->createMockCheck('failing', ['web'], HealthCheckStatus::UNHEALTHY, true);
+        $healthy = $this->createMockCheck('healthy', ['worker'], HealthCheckStatus::HEALTHY, true);
+
+        $service = new HealthCheckService([$failing, $healthy]);
+
+        $this->assertSame(HealthCheckStatus::UNHEALTHY, $service->getHealthStatus(group: 'web'));
+        $this->assertSame(HealthCheckStatus::HEALTHY, $service->getHealthStatus(group: 'worker'));
+    }
+
+    /**
+     * getHealthStatus() must reuse the cache instead of re-running every check.
+     */
+    public function testGetHealthStatusReusesCachedRun(): void
+    {
+        $callCount = 0;
+        $check = $this->createMock(HealthCheckInterface::class);
+        $check->method('getName')->willReturn('counted');
+        $check->method('getGroups')->willReturn([]);
+        $check->method('isCritical')->willReturn(true);
+        $check->method('getTimeout')->willReturn(5);
+        $check->method('check')->willReturnCallback(function () use (&$callCount): HealthCheckResult {
+            ++$callCount;
+
+            return new HealthCheckResult(
+                name: 'counted',
+                status: HealthCheckStatus::HEALTHY,
+                message: 'Test message',
+                duration: 0.0,
+                metadata: []
+            );
+        });
+
+        $service = new HealthCheckService([$check]);
+        $service->runAllChecks();
+        $service->getHealthStatus();
+
+        $this->assertSame(1, $callCount);
+    }
+
+    /**
+     * @param string[] $groups
+     */
     private function createMockCheck(
         string $name,
         array $groups,
@@ -505,6 +627,9 @@ class HealthCheckServiceTest extends TestCase
         return $check;
     }
 
+    /**
+     * @param string[] $groups
+     */
     private function createMockCheckWithDuration(
         string $name,
         array $groups,
