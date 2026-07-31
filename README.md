@@ -269,6 +269,19 @@ services:
             $critical: false  # Set to true if Redis failure should return 503
 ```
 
+If your application already builds its own Redis client — with TLS,
+authentication or specific timeouts — pass it as `$client` instead of `$host`
+and `$port`, so the check probes the connection the application actually uses:
+
+```yaml
+services:
+    Kiora\HealthCheckBundle\HealthCheck\Checks\RedisHealthCheck:
+        autoconfigure: true
+        arguments:
+            $client: '@app.redis_client'
+            $critical: false
+```
+
 **Step 3:** Add environment variables
 
 ```env
@@ -329,7 +342,14 @@ services:
             $timeout: 5
             $critical: false
             $expectedStatusCodes: [200, 401]  # 401 = API accessible but auth required
+            $httpClient: '@http_client'  # Recommended, see below
 ```
+
+**Pass an HTTP client when you can.** Without `$httpClient` the check falls back
+to PHP's stream wrapper, which requires `allow_url_fopen` to be enabled. Install
+`symfony/http-client` and inject `@http_client` for proper timeout, redirect and
+TLS handling. Either way the response body is never downloaded — only the status
+line is read.
 
 #### Example: Microsoft Graph API
 
@@ -540,14 +560,24 @@ The `statistics` section provides performance insights:
 
 ### Status Codes
 
-- **200 OK**: All critical checks passed
+- **200 OK**: All critical checks passed (overall status `healthy` or `degraded`)
 - **503 Service Unavailable**: One or more critical checks failed
 
 ### Check Status Values
 
 - `healthy`: Check passed successfully
 - `unhealthy`: Check failed
-- `degraded`: Check passed with warnings (reserved for future use)
+- `degraded`: Check passed with warnings, or exceeded its declared timeout
+
+### Overall Status
+
+The overall status aggregates the individual checks:
+
+- `unhealthy` — a **critical** check failed. Returns HTTP 503.
+- `degraded` — a check reported `degraded`, or a **non-critical** check failed.
+  Returns HTTP 200: the condition is reported to monitoring, but the instance
+  keeps serving traffic.
+- `healthy` — every check passed.
 
 ### Filtering Checks by Group
 
@@ -761,6 +791,21 @@ services:
 - Exception messages with sensitive data
 - Response sizes or client counts
 - Internal URLs or endpoints
+
+### Diagnosing Failures Without Leaking Detail
+
+Responses stay generic by design, which would otherwise leave you with
+`"Health check failed"` and no way to find out why. Checks extending
+`AbstractHealthCheck` implement PSR-3's `LoggerAwareInterface`, so with
+MonologBundle installed Symfony injects the logger automatically and the real
+exception is recorded server-side:
+
+```text
+[error] Health check "database" threw an exception {"check":"database","duration":2.014,"exception":"[object] (Doctrine\\DBAL\\Exception\\ConnectionException...)"}
+```
+
+The exception never reaches the HTTP response. Checks that exceed their declared
+timeout are logged as warnings and reported as `degraded`.
 
 ### Best Practices
 
