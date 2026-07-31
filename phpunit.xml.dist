@@ -21,7 +21,14 @@
         </testsuite>
     </testsuites>
 
-    <source>
+    <!--
+        restrictDeprecations limits failOnDeprecation to deprecations raised by
+        this bundle's own code. Without it, the lowest-dependencies CI run fails
+        on deprecations emitted inside vendor packages, which we cannot fix.
+    -->
+    <source restrictDeprecations="true"
+            restrictNotices="true"
+            restrictWarnings="true">
         <include>
             <directory>src</directory>
         </include>

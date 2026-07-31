@@ -189,13 +189,19 @@ class RecordingLogger extends AbstractLogger
     public array $records = [];
 
     /**
+     * $message is deliberately left untyped: psr/log only narrowed it to
+     * string|\Stringable in 3.0, and this bundle supports ^1.0|^2.0|^3.0.
+     * Widening a parameter stays compatible with all three.
+     *
+     * @param mixed                $level
+     * @param mixed                $message
      * @param array<string, mixed> $context
      */
-    public function log($level, \Stringable|string $message, array $context = []): void
+    public function log($level, $message, array $context = []): void
     {
         $this->records[] = [
             'level' => is_string($level) ? $level : (string) json_encode($level),
-            'message' => (string) $message,
+            'message' => $message instanceof \Stringable || is_scalar($message) ? (string) $message : '',
             'context' => $context,
         ];
     }
