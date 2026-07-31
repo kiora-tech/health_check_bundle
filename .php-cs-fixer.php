@@ -16,6 +16,9 @@ return $config->setRules([
         'not_operator_with_successor_space' => false,
         'trailing_comma_in_multiline' => true,
         'phpdoc_scalar' => true,
+        // @Symfony strips "@param mixed" as superfluous, but PHPStan level 9
+        // requires a type for every parameter. Keep them so the two tools agree.
+        'no_superfluous_phpdoc_tags' => ['allow_mixed' => true],
         'unary_operator_spaces' => true,
         'binary_operator_spaces' => true,
         'blank_line_before_statement' => [

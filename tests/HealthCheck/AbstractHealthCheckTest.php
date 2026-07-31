@@ -133,16 +133,25 @@ class ConcreteHealthCheck extends AbstractHealthCheck
     }
 
     // Public wrapper methods to test protected factory methods
+    /**
+     * @param array<string, mixed> $metadata
+     */
     public function testCreateHealthyResult(string $message, array $metadata = []): HealthCheckResult
     {
         return $this->createHealthyResult($message, $metadata);
     }
 
+    /**
+     * @param array<string, mixed> $metadata
+     */
     public function testCreateUnhealthyResult(string $message, array $metadata = []): HealthCheckResult
     {
         return $this->createUnhealthyResult($message, $metadata);
     }
 
+    /**
+     * @param array<string, mixed> $metadata
+     */
     public function testCreateDegradedResult(string $message, array $metadata = []): HealthCheckResult
     {
         return $this->createDegradedResult($message, $metadata);

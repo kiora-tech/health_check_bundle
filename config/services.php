@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 
 use Kiora\HealthCheckBundle\Controller\HealthCheckController;
+use Kiora\HealthCheckBundle\Controller\PingController;
 use Kiora\HealthCheckBundle\HealthCheck\Checks\DatabaseHealthCheck;
-use Kiora\HealthCheckBundle\HealthCheck\Checks\HttpHealthCheck;
-use Kiora\HealthCheckBundle\HealthCheck\Checks\RedisHealthCheck;
 use Kiora\HealthCheckBundle\Service\HealthCheckService;
 
 return static function (ContainerConfigurator $container): void {
@@ -21,8 +20,13 @@ return static function (ContainerConfigurator $container): void {
         ->arg('$healthChecks', tagged_iterator('health_check.checker'))
         ->public();
 
-    // Controller
+    // Controllers
     $services->set(HealthCheckController::class)
+        ->tag('controller.service_arguments');
+
+    // PingController performs no dependency checks, but still needs to be a
+    // registered service for the /ping route to resolve.
+    $services->set(PingController::class)
         ->tag('controller.service_arguments');
 
     // Built-in Health Checks

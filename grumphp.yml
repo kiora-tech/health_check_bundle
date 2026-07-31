@@ -1,8 +1,11 @@
 grumphp:
     tasks:
+        # Level is intentionally omitted: phpstan.neon is the single source of
+        # truth. Setting it here silently overrode that file with a laxer level.
         phpstan:
-            level: 8
             configuration: phpstan.neon
+            # Matches the composer script; the 128M default crashes the worker.
+            memory_limit: "256M"
         phpcsfixer:
             config: .php-cs-fixer.php
             allow_risky: true

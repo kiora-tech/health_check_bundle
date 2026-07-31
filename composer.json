@@ -17,6 +17,7 @@
     },
     "require": {
         "php": ">=8.3",
+        "psr/log": "^1.0|^2.0|^3.0",
         "symfony/framework-bundle": "^6.4|^7.0|^8.0",
         "symfony/dependency-injection": "^6.4|^7.0|^8.0",
         "symfony/config": "^6.4|^7.0|^8.0",
@@ -31,7 +32,14 @@
         "phpro/grumphp": "^2.0",
         "doctrine/dbal": "^3.0|^4.0",
         "league/flysystem": "^3.0",
-        "predis/predis": "^2.0"
+        "predis/predis": "^2.0",
+        "symfony/http-client-contracts": "^3.0|^4.0"
+    },
+    "suggest": {
+        "doctrine/dbal": "To use the built-in DatabaseHealthCheck",
+        "league/flysystem": "To use the built-in S3HealthCheck",
+        "ext-redis": "To use the built-in RedisHealthCheck",
+        "symfony/http-client": "To use HttpHealthCheck with a real HTTP client instead of the file_get_contents fallback"
     },
     "config": {
         "allow-plugins": {

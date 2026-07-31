@@ -153,7 +153,7 @@ class HealthCheckControllerTest extends TestCase
         $request = new Request();
         $response = $controller->check($request);
 
-        $data = json_decode($response->getContent(), true);
+        $data = json_decode((string) $response->getContent(), true);
         $this->assertIsArray($data);
         $this->assertArrayHasKey('status', $data);
         $this->assertArrayHasKey('timestamp', $data);
@@ -233,7 +233,7 @@ class HealthCheckControllerTest extends TestCase
         $this->assertInstanceOf(JsonResponse::class, $response);
         $this->assertEquals(200, $response->getStatusCode());
 
-        $data = json_decode($response->getContent(), true);
+        $data = json_decode((string) $response->getContent(), true);
         $this->assertIsArray($data);
         $this->assertArrayHasKey('checks', $data);
         $this->assertEmpty($data['checks']);
@@ -263,6 +263,103 @@ class HealthCheckControllerTest extends TestCase
         $this->assertStringContainsString('no-cache', $cacheControl);
         $this->assertStringContainsString('must-revalidate', $cacheControl);
         $this->assertStringContainsString('private', $cacheControl);
+    }
+
+    /**
+     * A degraded application still serves traffic.
+     *
+     * Only a critical failure warrants 503; answering 503 for a degraded state
+     * would pull the instance out of rotation over a non-critical dependency.
+     */
+    public function testCheckReturns200WhenDegraded(): void
+    {
+        $service = $this->createMock(HealthCheckService::class);
+        $service->method('runAllChecks')->willReturn([
+            'status' => 'degraded',
+            'timestamp' => '2024-01-01T00:00:00+00:00',
+            'duration' => 0.123,
+            'checks' => [],
+        ]);
+
+        $controller = new HealthCheckController($service);
+        $response = $controller->check(new Request());
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+
+    public function testReadinessReturns200WhenDegraded(): void
+    {
+        $service = $this->createMock(HealthCheckService::class);
+        $service->method('runAllChecks')->willReturn([
+            'status' => 'degraded',
+            'timestamp' => '2024-01-01T00:00:00+00:00',
+            'duration' => 0.123,
+            'checks' => [],
+        ]);
+
+        $controller = new HealthCheckController($service);
+        $response = $controller->readiness(new Request());
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+
+    /**
+     * An unrecognised status must fail closed rather than be treated as healthy.
+     */
+    public function testUnknownStatusFallsBackTo503(): void
+    {
+        $service = $this->createMock(HealthCheckService::class);
+        $service->method('runAllChecks')->willReturn([
+            'status' => 'bogus',
+            'timestamp' => '2024-01-01T00:00:00+00:00',
+            'duration' => 0.123,
+            'checks' => [],
+        ]);
+
+        $controller = new HealthCheckController($service);
+        $response = $controller->check(new Request());
+
+        $this->assertEquals(503, $response->getStatusCode());
+    }
+
+    /**
+     * A malformed probe URL (?group[]=web) must not make the endpoint itself
+     * fail; the filter is simply ignored.
+     */
+    public function testArrayShapedGroupParameterIsIgnored(): void
+    {
+        $service = $this->createMock(HealthCheckService::class);
+        $service->expects($this->once())
+            ->method('runAllChecks')
+            ->with(null)
+            ->willReturn([
+                'status' => 'healthy',
+                'timestamp' => '2024-01-01T00:00:00+00:00',
+                'duration' => 0.123,
+                'checks' => [],
+            ]);
+
+        $controller = new HealthCheckController($service);
+        $response = $controller->check(new Request(['group' => ['web', 'worker']]));
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+
+    public function testEmptyGroupParameterIsTreatedAsNoFilter(): void
+    {
+        $service = $this->createMock(HealthCheckService::class);
+        $service->expects($this->once())
+            ->method('runAllChecks')
+            ->with(null)
+            ->willReturn([
+                'status' => 'healthy',
+                'timestamp' => '2024-01-01T00:00:00+00:00',
+                'duration' => 0.123,
+                'checks' => [],
+            ]);
+
+        $controller = new HealthCheckController($service);
+        $controller->check(new Request(['group' => '']));
     }
 
     public function testReadinessReturnsValidJsonStructure(): void
@@ -296,7 +393,7 @@ class HealthCheckControllerTest extends TestCase
         $request = new Request();
         $response = $controller->readiness($request);
 
-        $data = json_decode($response->getContent(), true);
+        $data = json_decode((string) $response->getContent(), true);
         $this->assertIsArray($data);
         $this->assertArrayHasKey('status', $data);
         $this->assertArrayHasKey('timestamp', $data);

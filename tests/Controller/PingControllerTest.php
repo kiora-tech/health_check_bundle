@@ -27,7 +27,7 @@ class PingControllerTest extends TestCase
         $this->assertInstanceOf(JsonResponse::class, $response);
         $this->assertEquals(200, $response->getStatusCode());
 
-        $data = json_decode($response->getContent(), true);
+        $data = json_decode((string) $response->getContent(), true);
         $this->assertIsArray($data);
         $this->assertEquals('up', $data['status']);
         $this->assertArrayHasKey('timestamp', $data);
@@ -36,9 +36,11 @@ class PingControllerTest extends TestCase
     public function testPingReturnsValidTimestamp(): void
     {
         $response = $this->controller->ping();
-        $data = json_decode($response->getContent(), true);
+        $data = json_decode((string) $response->getContent(), true);
 
         // Verify timestamp is in RFC3339 format
+        $this->assertIsArray($data);
+        $this->assertIsString($data['timestamp']);
         $this->assertNotEmpty($data['timestamp']);
         $timestamp = \DateTimeImmutable::createFromFormat(\DateTimeInterface::RFC3339, $data['timestamp']);
         $this->assertInstanceOf(\DateTimeImmutable::class, $timestamp);

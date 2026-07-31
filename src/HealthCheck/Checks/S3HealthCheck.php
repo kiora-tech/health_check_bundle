@@ -55,11 +55,18 @@ class S3HealthCheck extends AbstractHealthCheck
     protected function doCheck(): HealthCheckResult
     {
         try {
-            // Try to list files (limit to 1) to verify bucket access
-            $this->filesystem->listContents('/', false)->toArray();
+            // Pull a single entry rather than calling toArray(): that would page
+            // through every object in the bucket and hold them all in memory,
+            // which on a large bucket turns this check into an outage of its own.
+            // Reaching the first entry already proves the bucket is listable.
+            foreach ($this->filesystem->listContents('/', false) as $entry) {
+                unset($entry);
+
+                break;
+            }
 
             return $this->createHealthyResult('S3 storage operational');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return $this->createUnhealthyResult('S3 storage connection failed');
         }
     }
